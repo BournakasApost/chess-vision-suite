@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Vision Suite - Pro Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    
+    <!-- External Puzzle Databases -->
+    <script src="blind_games_db.js"></script>
+    <script src="blind_tactics_db.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .boss-glow { filter: drop-shadow(0 0 10px rgba(147, 51, 234, 0.7)); }
+        
+        /* Animation for wrong answers in Adaptive Engine */
+        .shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useRef } = React;
+
+        // --- DATABASE INIT ---
+        const BLIND_GAMES = window.BLIND_GAMES_DB || [];
+        const BLIND_TACTICS = window.BLIND_TACTICS_DB || [];
+
+        // --- SVG PIECE COMPONENTS ---
+        const PIECE_IMAGES = {
+            White: {
+                Pawn: "https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg",
+                Knight: "https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg",
+                Bishop: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg",
+                Rook: "https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg",
+                Queen: "https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg",
+                King: "https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg"
+            },
+            Black: { 
+                Pawn: "https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg",
+                Knight: "https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg",
+                Bishop: "https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg",
+                Rook: "https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg",
+                Queen: "https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg",
+                King: "https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg"
+            }
+        };
+
+        const Piece = ({ type, color = 'White' }) => {
+            return (
+                <img 
+                    src={PIECE_IMAGES[color][type]} 
+                    alt={`${color} ${type}`} 
+                    className="w-full h-full select-none pointer-events-none drop-shadow-md"
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                />
+            );
+        };
+
+        // --- CHESS LOGIC HELPERS ---
+        const toCoord = (x, y) => String.fromCharCode(x + 97) + (y + 1);
+        const isDarkSquare = (x, y) => (x + y) % 2 === 0;
+        
+        const toIdx = (coord) => {
+            const clean = coord.trim().toLowerCase();
+            if (clean.length !== 2) return null;
+            const x = clean.charCodeAt(0) - 97;
+            const y = parseInt(clean[1]) - 1;
+            if (x >= 0 && x <= 7 && y >= 0 && y <= 7) return [x, y];
+            return null;
+        };
+
+        const getPiecesFromFEN = (fenStr) => {
+            const tempChess = new Chess(fenStr);
+            const board = tempChess.board();
+            const typeMap = { 'p': 'Pawn', 'n': 'Knight', 'b': 'Bishop', 'r': 'Rook', 'q': 'Queen', 'k': 'King' };
+            const pArr = [];
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    if (board[r][c]) {
+                        pArr.push({
+                            pos: [c, 7 - r],
+                            type: typeMap[board[r][c].type],
+                            color: board[r][c].color === 'w' ? 'White' : 'Black'
+                        });
+                    }
+                }
+            }
+            return pArr;
+        };
+
+        const getKnightMoves = (x, y) => {
+            const moves = [];
+            [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]].forEach(([dx, dy]) => {
+                const nx = x + dx, ny = y + dy;
+                if (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 7) moves.push([nx, ny]);
+            });
+            return moves;
+        };
+
+        const getSlidingMoves = (x, y, dirs, occ) => {
+            const moves = [];
+            for (const [dx, dy] of dirs) {
+                let nx = x + dx, ny = y + dy;
+                while (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 7) {
+                    moves.push([nx, ny]);
+                    if (occ.has(`${nx},${ny}`)) break;
+                    nx += dx; ny += dy;
+                }
+            }
+            return moves;
+        };
+
+        const getBishopMoves = (x, y, occ = new Set()) => getSlidingMoves(x, y, [[1, 1], [1, -1], [-1, -1], [-1, 1]], occ);
+        const getRookMoves = (x, y, occ = new Set()) => getSlidingMoves(x, y, [[0, 1], [1, 0], [0, -1], [-1, 0]], occ);
+        
+        const getKingMoves = (x, y) => {
+            const moves = [];
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    if (dx === 0 && dy === 0) continue;
+                    const nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 7) moves.push([nx, ny]);
+                }
+            }
+            return moves;
+        };
+
+        const getPawnAttacks = (x, y) => {
+            const moves = [];
+            if (y - 1 >= 0) {
+                if (x - 1 >= 0) moves.push([x - 1, y - 1]);
+                if (x + 1 <= 7) moves.push([x + 1, y - 1]);
+            }
+            return moves;
+        };
+
+        const isQueenAttack = (qx, qy, tx, ty) => {
+            if (qx === tx && qy === ty) return false;
+            return qx === tx || qy === ty || Math.abs(qx - tx) === Math.abs(qy - ty);
+        };
+
+        const generateThreatMap = (ghosts) => {
+            const threatened = new Set();
+            const occ = new Set(ghosts.map(g => `${g.pos[0]},${g.pos[1]}`));
+            
+            ghosts.forEach(g => {
+                const [gx, gy] = g.pos;
+                threatened.add(`${gx},${gy}`); // Ghost's own square is dangerous
+                let m = [];
+                if (g.type === 'Bishop') m = getBishopMoves(gx, gy, occ);
+                else if (g.type === 'Rook') m = getRookMoves(gx, gy, occ);
+                else if (g.type === 'Queen') m = [...getBishopMoves(gx, gy, occ), ...getRookMoves(gx, gy, occ)];
+                else if (g.type === 'Knight') m = getKnightMoves(gx, gy);
+                else if (g.type === 'King') m = getKingMoves(gx, gy);
+                else if (g.type === 'Pawn') m = getPawnAttacks(gx, gy);
+                
+                m.forEach(([mx, my]) => threatened.add(`${mx},${my}`));
+            });
+            return threatened;
+        };
+
+        const getShortestPath = (start, end, ghosts, pieceType = 'Knight') => {
+            const threat = generateThreatMap(ghosts);
+            const occ = new Set(ghosts.map(g => `${g.pos[0]},${g.pos[1]}`));
+            const q = [[start, 0]];
+            const visited = new Set([`${start[0]},${start[1]}`]);
+            
+            while (q.length > 0) {
+                const [[cx, cy], m] = q.shift();
+                if (cx === end[0] && cy === end[1]) return m;
+                
+                let nextMoves = [];
+                if (pieceType === 'Knight') nextMoves = getKnightMoves(cx, cy);
+                else if (pieceType === 'Bishop') nextMoves = getBishopMoves(cx, cy, occ);
+                else if (pieceType === 'Rook') nextMoves = getRookMoves(cx, cy, occ);
+                
+                nextMoves.forEach(([nx, ny]) => {
+                    const key = `${nx},${ny}`;
+                    if (!threat.has(key) && !visited.has(key)) {
+                        visited.add(key); 
+                        q.push([[nx, ny], m + 1]);
+                    }
+                });
+            }
+            return null;
+        };
+
+        // --- ADAPTIVE ENGINE ---
+        const useAdaptiveEngine = (db, startLevel) => {
+            const [currentLevel, setCurrentLevel] = useState(startLevel);
+            const [seenIds, setSeenIds] = useState(new Set());
+
+            const getNextPuzzle = useCallback((targetLevel) => {
+                if (!db || db.length === 0) return null;
+
+                // Priority 1: +/- 1 Range, Unseen
+                let pool = db.filter(p => !seenIds.has(p.id) && p.difficulty >= targetLevel - 1 && p.difficulty <= targetLevel + 1);
+                
+                // Priority 2: +/- 2 Range, Unseen
+                if (pool.length === 0) {
+                    pool = db.filter(p => !seenIds.has(p.id) && p.difficulty >= targetLevel - 2 && p.difficulty <= targetLevel + 2);
+                }
+
+                // Priority 3: Fail-safe (Out of unseen puzzles, reset memory, pick closest)
+                if (pool.length === 0) {
+                    setSeenIds(new Set()); 
+                    pool = db.filter(p => p.difficulty >= targetLevel - 2 && p.difficulty <= targetLevel + 2);
+                    if (pool.length === 0) pool = db; 
+                }
+
+                const selected = pool[Math.floor(Math.random() * pool.length)];
+                setSeenIds(prev => new Set(prev).add(selected.id));
+                return selected;
+            }, [db, seenIds]);
+
+            const updateLevel = (delta) => {
+                setCurrentLevel(prev => {
+                    const newLvl = Math.max(1.0, Math.min(10.0, prev + delta));
+                    return Number(newLvl.toFixed(1)); 
+                });
+            };
+
+            return { currentLevel, getNextPuzzle, updateLevel };
+        };
+
+        // --- UI COMPONENTS ---
+        const Scoresheet = ({ moves, activeIndex = -1, darkTheme = false }) => {
+            const rows = [];
+            for (let i = 0; i < moves.length; i += 2) {
+                rows.push({
+                    num: Math.floor(i / 2) + 1,
+                    w: moves[i],
+                    wIdx: i,
+                    b: moves[i + 1] || '',
+                    bIdx: i + 1
+                });
+            }
+            
+            const bgClass = darkTheme ? 'bg-slate-900/50 text-slate-300' : 'bg-slate-50 text-slate-700 shadow-inner border border-slate-200';
+            const hoverClass = darkTheme ? 'hover:bg-slate-800' : 'hover:bg-slate-200/50';
+            const numClass = darkTheme ? 'text-slate-500' : 'text-slate-400';
+            const activeClass = darkTheme ? 'bg-blue-900/50 text-blue-200 rounded px-1' : 'bg-blue-200 text-blue-900 rounded px-1';
+
+            return (
+                <div className={`w-full rounded-lg p-3 max-h-48 overflow-y-auto font-mono text-sm md:text-base ${bgClass}`}>
+                    {rows.map(r => (
+                        <div key={r.num} className={`flex py-1 px-2 ${hoverClass} rounded transition-colors`}>
+                            <div className={`w-10 font-bold ${numClass}`}>{r.num}.</div>
+                            <div className={`w-16 font-semibold flex-1 ${activeIndex === r.wIdx ? activeClass : ''}`}>{r.w}</div>
+                            <div className={`w-16 font-semibold flex-1 ${activeIndex === r.bIdx ? activeClass : ''}`}>{r.b}</div>
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        const Chessboard = ({ pieces = [], markers = [], onSquareClick, disabled = false, showCoords = true, renderMode = 'normal' }) => {
+            const squares = [];
+            for (let row = 7; row >= 0; row--) {
+                for (let col = 0; col <= 7; col++) {
+                    const isDark = isDarkSquare(col, row);
+                    const piece = pieces.find(p => p.pos[0] === col && p.pos[1] === row);
+                    const marker = markers.find(m => m.pos[0] === col && m.pos[1] === row);
+                    
+                    squares.push(
+                        <div 
+                            key={`${col}-${row}`}
+                            onClick={() => !disabled && onSquareClick && onSquareClick(col, row)}
+                            className={`relative w-full aspect-square flex items-center justify-center select-none overflow-hidden
+                                ${isDark ? 'bg-slate-500' : 'bg-slate-200'}
+                                ${onSquareClick && !disabled ? 'cursor-pointer hover:opacity-80' : ''}
+                            `}
+                        >
+                            {showCoords && col === 0 && <span className={`absolute top-1 left-1 text-[10px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>{row + 1}</span>}
+                            {showCoords && row === 0 && <span className={`absolute bottom-0 right-1 text-[10px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>{String.fromCharCode(col + 97)}</span>}
+                            
+                            {marker && <div className={`absolute w-full h-full ${marker.opacity || 'opacity-60'} ${marker.color}`} />}
+                            
+                            {piece && renderMode === 'circles' ? (
+                                <div className={`w-[55%] h-[55%] rounded-full shadow-md border-4 border-black/10 z-10 ${piece.color === 'White' ? 'bg-slate-100' : 'bg-slate-800'}`} />
+                            ) : piece && (
+                                <div className={`relative w-[80%] h-[80%] z-10 transition-transform hover:scale-110 ${piece.isBoss ? 'boss-glow' : ''}`}>
+                                    <Piece type={piece.type} color={piece.color} />
+                                </div>
+                            )}
+                        </div>
+                    );
+                }
+            }
+
+            return (
+                <div className="w-full max-w-md mx-auto border-4 border-slate-800 rounded-sm overflow-hidden shadow-2xl bg-white">
+                    <div className="grid grid-cols-8 grid-rows-8 w-full h-full">
+                        {squares}
+                    </div>
+                </div>
+            );
+        };
+
+        const TierSelector = ({ onSelect, onBack }) => (
+            <div className="flex flex-col items-center w-full max-w-lg mt-8 space-y-6">
+                <div className="text-center mb-4">
+                    <h2 className="text-3xl font-black text-slate-800">Select Starting Tier</h2>
+                    <p className="text-slate-500 font-medium mt-2">The Adaptive Engine will adjust difficulty based on your performance.</p>
+                </div>
+                
+                <button onClick={() => onSelect(1.0)} className="w-full text-left p-6 bg-white rounded-xl shadow-sm border-2 border-green-200 hover:border-green-600 hover:shadow-md transition group">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-xl font-bold text-green-700">Novice Tier</h3>
+                        <span className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded">Start: Level 1.0</span>
+                    </div>
+                    <p className="text-slate-500 mt-2">Building foundational visualization. Focus on 1-move calculations.</p>
+                </button>
+
+                <button onClick={() => onSelect(4.0)} className="w-full text-left p-6 bg-white rounded-xl shadow-sm border-2 border-blue-200 hover:border-blue-600 hover:shadow-md transition group">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-xl font-bold text-blue-700">Club Tier</h3>
+                        <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded">Start: Level 4.0</span>
+                    </div>
+                    <p className="text-slate-500 mt-2">Testing your sight. Deep tactical lines and first-contact trades.</p>
+                </button>
+
+                <button onClick={() => onSelect(7.0)} className="w-full text-left p-6 bg-white rounded-xl shadow-sm border-2 border-purple-200 hover:border-purple-600 hover:shadow-md transition group">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-xl font-bold text-purple-700">Master Tier</h3>
+                        <span className="bg-purple-100 text-purple-800 text-xs font-bold px-3 py-1 rounded">Start: Level 7.0</span>
+                    </div>
+                    <p className="text-slate-500 mt-2">Elite calculation. Complex interference, quiet moves, and deep variations.</p>
+                </button>
+
+                <button onClick={onBack} className="mt-8 text-slate-500 hover:text-slate-800 underline">Back to Menu</button>
+            </div>
+        );
+
+
+        // --- ADAPTIVE DRILLS ---
+
+        const BlindGameDrill = ({ onExit, isHardcore, startLevel }) => {
+            const { currentLevel, getNextPuzzle, updateLevel } = useAdaptiveEngine(BLIND_GAMES, startLevel);
+            
+            const [puzzle, setPuzzle] = useState(null);
+            const [moveIndex, setMoveIndex] = useState(0);
+            const [chessEngine] = useState(new Chess());
+            const [currentFen, setCurrentFen] = useState('');
+            const [feedback, setFeedback] = useState("");
+            const [inputVal, setInputVal] = useState("");
+            
+            // Interaction State: 'playing', 'strike1', 'revealed'
+            const [attemptState, setAttemptState] = useState('playing');
+            const [shakeError, setShakeError] = useState(false);
+
+            const loadNewPuzzle = useCallback((targetLvl) => {
+                const nextPuzz = getNextPuzzle(targetLvl);
+                if (nextPuzz) {
+                    chessEngine.load(nextPuzz.fen);
+                    setCurrentFen(chessEngine.fen());
+                    setPuzzle(nextPuzz);
+                    setMoveIndex(0);
+                    setFeedback(isHardcore ? "Visualize the moves from the text." : "Use Arrow Keys to play the variation.");
+                    setInputVal("");
+                    setAttemptState('playing');
+                } else {
+                    setFeedback("Database empty! Please add puzzles to blind_games_db.js");
+                }
+            }, [getNextPuzzle, chessEngine, isHardcore]);
+
+            useEffect(() => {
+                if (!puzzle) loadNewPuzzle(currentLevel);
+            }, [puzzle, loadNewPuzzle, currentLevel]);
+
+            useEffect(() => {
+                if (isHardcore || !puzzle) return;
+                const handleKeyDown = (e) => {
+                    if (e.key === 'ArrowRight' && moveIndex < puzzle.moves.length) {
+                        chessEngine.move(puzzle.moves[moveIndex]);
+                        setCurrentFen(chessEngine.fen());
+                        setMoveIndex(prev => prev + 1);
+                    } else if (e.key === 'ArrowLeft' && moveIndex > 0) {
+                        chessEngine.undo();
+                        setCurrentFen(chessEngine.fen());
+                        setMoveIndex(prev => prev - 1);
+                    }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [moveIndex, puzzle, chessEngine, isHardcore]);
+
+            const triggerShake = () => {
+                setShakeError(false);
+                setTimeout(() => setShakeError(true), 10);
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (attemptState === 'revealed') return;
+
+                const isCorrect = inputVal.trim().toLowerCase() === puzzle.solution.toLowerCase();
+
+                if (isCorrect) {
+                    if (attemptState === 'playing') {
+                        setFeedback("Perfect! Clean calculation. (+0.4)");
+                        updateLevel(0.4);
+                        setAttemptState('revealed');
+                        setTimeout(() => loadNewPuzzle(currentLevel + 0.4), 2000);
+                    } else {
+                        setFeedback("Correct! Good recovery. (-0.4)");
+                        updateLevel(-0.4);
+                        setAttemptState('revealed');
+                        setTimeout(() => loadNewPuzzle(currentLevel - 0.4), 2000);
+                    }
+                } else {
+                    triggerShake();
+                    if (attemptState === 'playing') {
+                        setFeedback("Incorrect. Double-check your vision! (Strike 1)");
+                        setAttemptState('strike1');
+                    } else {
+                        setFeedback(`Incorrect. Solution was ${puzzle.solution}. (-1.0)`);
+                        updateLevel(-1.0);
+                        setAttemptState('revealed');
+                        setTimeout(() => loadNewPuzzle(currentLevel - 1.0), 3500);
+                    }
+                }
+            };
+
+            if (!puzzle) return <div className="text-slate-500 font-bold mt-10">Loading Database...</div>;
+            const isVariationComplete = moveIndex === puzzle.moves.length;
+
+            return (
+                <div className="flex flex-col items-center w-full">
+                    <div className="flex justify-between w-full max-w-4xl px-2 mb-4 items-center">
+                        <div className="font-bold text-slate-700">Adaptive Rank: <span className="text-blue-600">Level {currentLevel.toFixed(1)}</span></div>
+                        <div className="text-xs font-bold bg-slate-200 text-slate-700 px-3 py-1 rounded">Puzzle Diff: {puzzle.difficulty}/10</div>
+                    </div>
+
+                    <div className={`text-sm md:text-base font-bold min-h-[1.5rem] mb-4 text-center ${feedback.includes('Incorrect') ? 'text-red-500' : feedback.includes('Perfect') || feedback.includes('recovery') ? 'text-green-600' : 'text-slate-600'}`}>
+                        {feedback}
+                    </div>
+
+                    <div className="flex flex-col md:flex-row items-center md:items-start justify-center gap-8 w-full max-w-4xl px-4">
+                        <div className="w-full max-w-sm shrink-0 order-1">
+                            {isHardcore ? (
+                                <div className="bg-white p-6 rounded-xl shadow-md border-2 border-slate-200 text-center h-64 flex flex-col items-center justify-center">
+                                    <div className="text-xl text-slate-800 font-black mb-2">Hardcore Mode</div>
+                                    <p className="text-slate-500 text-sm">Visualize the variation entirely in your mind.</p>
+                                </div>
+                            ) : (
+                                <Chessboard pieces={getPiecesFromFEN(currentFen)} renderMode="circles" />
+                            )}
+                        </div>
+
+                        <div className="w-full md:w-80 flex flex-col space-y-4 shrink-0 order-2">
+                            <div className="bg-white p-6 rounded-xl shadow-md border-2 border-slate-200 text-center w-full">
+                                <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Variation Line</div>
+                                {isHardcore ? (
+                                    <Scoresheet moves={puzzle.moves} />
+                                ) : (
+                                    <Scoresheet moves={puzzle.moves.slice(0, moveIndex)} activeIndex={moveIndex - 1} />
+                                )}
+                            </div>
+
+                            {(isVariationComplete || isHardcore) && (
+                                <div className={`w-full bg-blue-50 p-6 rounded-xl border border-blue-200 text-center shadow-sm ${shakeError ? 'shake' : ''}`}>
+                                    <div className="text-sm font-bold text-blue-800 mb-4">{puzzle.question}</div>
+                                    <form onSubmit={handleSubmit} className="flex flex-col space-y-3">
+                                        <input 
+                                            type="text" 
+                                            value={inputVal} 
+                                            onChange={(e) => setInputVal(e.target.value)} 
+                                            placeholder="Strict Notation (e.g. Nxf7+)" 
+                                            disabled={attemptState === 'revealed'}
+                                            className="px-4 py-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:border-blue-600 text-center font-bold w-full disabled:opacity-50"
+                                        />
+                                        <button type="submit" disabled={attemptState === 'revealed'} className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition disabled:opacity-50">Submit Answer</button>
+                                    </form>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <button onClick={onExit} className="mt-8 text-slate-500 hover:text-slate-800 underline">Back to Menu</button>
+                </div>
+            );
+        };
+
+        const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
+            const { currentLevel, getNextPuzzle, updateLevel } = useAdaptiveEngine(BLIND_TACTICS, startLevel);
+            
+            const [puzzle, setPuzzle] = useState(null);
+            const [feedback, setFeedback] = useState("");
+            const [inputVal, setInputVal] = useState("");
+            const [hintRevealed, setHintRevealed] = useState(!isHardcore);
+            
+            const [attemptState, setAttemptState] = useState('playing');
+            const [shakeError, setShakeError] = useState(false);
+
+            const loadNewPuzzle = useCallback((targetLvl) => {
+                const nextPuzz = getNextPuzzle(targetLvl);
+                if (nextPuzz) {
+                    setPuzzle(nextPuzz);
+                    setFeedback("Visualize the Fog moves. What is the winning reply?");
+                    setInputVal("");
+                    setHintRevealed(!isHardcore);
+                    setAttemptState('playing');
+                } else {
+                    setFeedback("Database empty! Please add puzzles to blind_tactics_db.js");
+                }
+            }, [getNextPuzzle, isHardcore]);
+
+            useEffect(() => {
+                if (!puzzle) loadNewPuzzle(currentLevel);
+            }, [puzzle, loadNewPuzzle, currentLevel]);
+
+            const triggerShake = () => {
+                setShakeError(false);
+                setTimeout(() => setShakeError(true), 10);
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (attemptState === 'revealed') return;
+
+                const isCorrect = inputVal.trim().toLowerCase() === puzzle.solution.toLowerCase();
+
+                if (isCorrect) {
+                    if (attemptState === 'playing') {
+                        setFeedback("Perfect! Tactical vision is sharp. (+0.4)");
+                        updateLevel(0.4);
+                        setAttemptState('revealed');
+                        setTimeout(() => loadNewPuzzle(currentLevel + 0.4), 2000);
+                    } else {
+                        setFeedback("Correct! Good recovery. (-0.4)");
+                        updateLevel(-0.4);
+                        setAttemptState('revealed');
+                        setTimeout(() => loadNewPuzzle(currentLevel - 0.4), 2000);
+                    }
+                } else {
+                    triggerShake();
+                    if (attemptState === 'playing') {
+                        setFeedback("Incorrect. Look for lava squares! (Strike 1)");
+                        setAttemptState('strike1');
+                    } else {
+                        setFeedback(`Incorrect. Solution was ${puzzle.solution}. (-1.0)`);
+                        updateLevel(-1.0);
+                        setAttemptState('revealed');
+                        setTimeout(() => loadNewPuzzle(currentLevel - 1.0), 3500);
+                    }
+                }
+            };
+
+            if (!puzzle) return <div className="text-slate-500 font-bold mt-10">Loading Database...</div>;
+            const flatFogMoves = puzzle.fog.join(' ').replace(/\d+\.\s*/g, '').split(' ').filter(Boolean);
+
+            return (
+                <div className="flex flex-col items-center w-full">
+                    <div className="flex justify-between w-full max-w-4xl px-2 mb-4 items-center">
+                        <div className="font-bold text-slate-700">Adaptive Rank: <span className="text-blue-600">Level {currentLevel.toFixed(1)}</span></div>
+                        <div className="flex items-center space-x-2">
+                            {isHardcore && !hintRevealed && attemptState === 'strike1' && (
+                                <button onClick={() => setHintRevealed(true)} className="text-xs font-bold bg-purple-100 text-purple-700 px-3 py-1 rounded hover:bg-purple-200 transition animate-pulse">
+                                    Use Second-Chance Hint
+                                </button>
+                            )}
+                            <div className="text-xs font-bold bg-slate-200 text-slate-700 px-3 py-1 rounded">Puzzle Diff: {puzzle.difficulty}/10</div>
+                        </div>
+                    </div>
+
+                    <div className={`text-sm md:text-base font-bold min-h-[1.5rem] mb-4 text-center ${feedback.includes('Incorrect') ? 'text-red-500' : feedback.includes('Perfect') || feedback.includes('recovery') ? 'text-green-600' : 'text-slate-600'}`}>
+                        {feedback}
+                    </div>
+
+                    <div className="flex flex-col md:flex-row items-center md:items-start justify-center gap-8 w-full max-w-4xl px-4">
+                        <div className="w-full max-w-sm shrink-0 order-1">
+                            <Chessboard pieces={getPiecesFromFEN(puzzle.fen)} renderMode="normal" />
+                        </div>
+                        
+                        <div className="w-full md:w-80 flex flex-col space-y-4 shrink-0 order-2">
+                            {hintRevealed && (
+                                <div className="text-sm font-black text-purple-600 uppercase tracking-widest bg-purple-50 px-4 py-3 rounded-xl border border-purple-100 text-center shadow-sm">
+                                    Theme: {puzzle.theme}
+                                </div>
+                            )}
+                            
+                            <div className={`bg-slate-800 p-6 rounded-xl shadow-xl border-b-4 border-slate-900 w-full ${attemptState === 'strike1' ? 'border-red-500 transition-colors duration-500' : ''}`}>
+                                <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center justify-center space-x-2">
+                                    <span>The Fog</span> 
+                                    <span className="bg-red-500 text-white px-2 py-0.5 rounded text-[10px]">MENTAL MOVES</span>
+                                </div>
+                                <Scoresheet moves={flatFogMoves} darkTheme={true} />
+                            </div>
+
+                            <form onSubmit={handleSubmit} className={`flex flex-col space-y-3 pt-2 ${shakeError ? 'shake' : ''}`}>
+                                <input 
+                                    type="text" 
+                                    value={inputVal} 
+                                    onChange={(e) => setInputVal(e.target.value)} 
+                                    placeholder="Strict Notation (e.g. Nxf7#)" 
+                                    disabled={attemptState === 'revealed'}
+                                    className="px-4 py-4 border-2 border-slate-300 rounded-xl focus:outline-none focus:border-slate-800 text-center font-bold shadow-inner w-full disabled:opacity-50"
+                                />
+                                <button type="submit" disabled={attemptState === 'revealed'} className="w-full bg-slate-800 text-white font-bold py-4 rounded-xl hover:bg-slate-700 transition shadow-md disabled:opacity-50">Execute Move</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <button onClick={onExit} className="mt-8 text-slate-500 hover:text-slate-800 underline">Back to Menu</button>
+                </div>
+            );
+        };
+
+        // --- NON-ADAPTIVE MINIGAMES ---
+        const SquareColorDrill = ({ onExit, isHardcore }) => {
+            const [streak, setStreak] = useState(0);
+            const [target, setTarget] = useState([0,0]);
+            const [feedback, setFeedback] = useState(null);
+
+            const generateNew = useCallback(() => {
+                setTarget([Math.floor(Math.random() * 8), Math.floor(Math.random() * 8)]);
+                setFeedback(null);
+            }, []);
+
+            useEffect(() => generateNew(), [generateNew]);
+
+            const handleGuess = (isGuessDark) => {
+                const isActuallyDark = isDarkSquare(target[0], target[1]);
+                if (isGuessDark === isActuallyDark) {
+                    setStreak(s => s + 1);
+                    setFeedback({ type: 'success', text: 'Correct!' });
+                    setTimeout(generateNew, 500);
+                } else {
+                    setStreak(0);
+                    setFeedback({ type: 'error', text: `Incorrect! ${toCoord(...target)} is a ${isActuallyDark ? 'Dark' : 'Light'} square.` });
+                    setTimeout(generateNew, 2000);
+                }
+            };
+
+            return (
+                <div className="flex flex-col items-center space-y-4 w-full">
+                    <div className="text-xl font-bold text-slate-700">Streak: <span className="text-green-600">{streak}</span></div>
+                    <div className="text-xl md:text-2xl font-semibold text-slate-600 text-center">
+                        What color is {isHardcore ? "this square?" : <span className="text-blue-600 font-bold">{toCoord(...target)}</span>}?
+                    </div>
+                    
+                    {isHardcore ? (
+                        <div className="text-8xl font-black text-slate-800 tracking-wider py-8">{toCoord(...target)}</div>
+                    ) : (
+                        <div className="w-full max-w-sm mb-2">
+                            <Chessboard pieces={[]} markers={[]} disabled={true} showCoords={false} />
+                        </div>
+                    )}
+
+                    {feedback && (
+                        <div className={`text-lg font-bold min-h-[1.5rem] ${feedback.type === 'success' ? 'text-green-500' : 'text-red-500'}`}>
+                            {feedback.text}
+                        </div>
+                    )}
+                    
+                    <div className="flex space-x-4 w-full max-w-sm mt-2">
+                        <button onClick={() => handleGuess(false)} disabled={!!feedback} className="flex-1 py-4 bg-slate-200 text-slate-800 font-bold rounded-lg shadow border-2 border-slate-300 hover:bg-slate-300 transition active:scale-95 disabled:opacity-50">LIGHT</button>
+                        <button onClick={() => handleGuess(true)} disabled={!!feedback} className="flex-1 py-4 bg-slate-700 text-white font-bold rounded-lg shadow border-2 border-slate-800 hover:bg-slate-600 transition active:scale-95 disabled:opacity-50">DARK</button>
+                    </div>
+                    <button onClick={onExit} className="mt-6 text-slate-500 hover:text-slate-800 underline">Back to Menu</button>
+                </div>
+            );
+        };
+
+        const KnightSightDrill = ({ onExit, isHardcore }) => {
+            const [knight, setKnight] = useState([0,0]);
+            const [legalMoves, setLegalMoves] = useState([]);
+            const [foundMoves, setFoundMoves] = useState(new Set());
+            const [mistakes, setMistakes] = useState(new Set());
+            const [feedback, setFeedback] = useState("Click all legal squares the Knight can jump to.");
+            const [textInput, setTextInput] = useState("");
+
+            const generateNew = useCallback(() => {
+                const x = Math.floor(Math.random() * 8), y = Math.floor(Math.random() * 8);
+                setKnight([x, y]);
+                setLegalMoves(getKnightMoves(x, y));
+                setFoundMoves(new Set());
+                setMistakes(new Set());
+                setFeedback(isHardcore ? "Type all legal jumps (comma separated, e.g., 'e4, d3')." : "Find all legal jumps!");
+                setTextInput("");
+            }, [isHardcore]);
+
+            useEffect(() => generateNew(), [generateNew]);
+
+            const handleSquareClick = (x, y) => {
+                if (isHardcore) return;
+                const key = `${x},${y}`;
+                if (x === knight[0] && y === knight[1]) return;
+                
+                const isLegal = legalMoves.some(m => m[0] === x && m[1] === y);
+                if (isLegal) {
+                    const newFound = new Set(foundMoves).add(key);
+                    setFoundMoves(newFound);
+                    if (newFound.size === legalMoves.length) {
+                        setFeedback("Perfect board vision!");
+                        setTimeout(generateNew, 1500);
+                    }
+                } else {
+                    setMistakes(new Set(mistakes).add(key));
+                    setFeedback("Hallucination! Knight cannot jump there.");
+                }
+            };
+
+            const handleTextSubmit = (e) => {
+                e.preventDefault();
+                const inputMoves = textInput.split(',').map(s => s.trim().toLowerCase()).filter(s => s);
+                let currentFound = new Set();
+                let currentMistakes = new Set();
+                let allCorrect = true;
+
+                inputMoves.forEach(moveStr => {
+                    const coords = toIdx(moveStr);
+                    if (!coords) {
+                        allCorrect = false;
+                        currentMistakes.add(moveStr);
+                        return;
+                    }
+                    const [x, y] = coords;
+                    if (x === knight[0] && y === knight[1]) return;
+                    
+                    const isLegal = legalMoves.some(m => m[0] === x && m[1] === y);
+                    if (isLegal) {
+                        currentFound.add(`${x},${y}`);
+                    } else {
+                        allCorrect = false;
+                        currentMistakes.add(`${x},${y}`);
+                    }
+                });
+
+                if (allCorrect && currentFound.size === legalMoves.length) {
+                    setFoundMoves(currentFound);
+                    setFeedback("Perfect board vision!");
+                    setTimeout(generateNew, 1500);
+                } else {
+                    setFoundMoves(currentFound);
+                    setMistakes(currentMistakes);
+                    if (!allCorrect) setFeedback("Hallucination or invalid square entered! Try again.");
+                    else setFeedback(`You missed ${legalMoves.length - currentFound.size} move(s).`);
+                }
+            };
+
+            const markers = [
+                ...Array.from(foundMoves).map(m => { const [x,y] = m.split(','); return { pos: [parseInt(x), parseInt(y)], color: 'bg-green-500' }; }),
+                ...Array.from(mistakes).map(m => { const [x,y] = m.split(','); return { pos: [parseInt(x), parseInt(y)], color: 'bg-red-500' }; })
+            ];
+
+            return (
+                <div className="flex flex-col items-center space-y-4 w-full">
+                    <div className="text-xl font-bold text-slate-700">Found: <span className="text-blue-600">{foundMoves.size} / {legalMoves.length}</span></div>
+                    <div className={`text-sm md:text-base font-semibold min-h-[1.5rem] ${feedback.includes('Perfect') ? 'text-green-600' : feedback.includes('Hallucination') ? 'text-red-500' : 'text-slate-600'}`}>
+                        {feedback}
+                    </div>
+                    
+                    {isHardcore ? (
+                        <div className="w-full max-w-md bg-white p-6 rounded-xl shadow-md border-2 border-slate-200">
+                            <div className="text-xl mb-4 font-bold text-center text-slate-800">Knight is on <span className="text-blue-600">{toCoord(...knight)}</span></div>
+                            <form onSubmit={handleTextSubmit} className="flex flex-col space-y-3">
+                                <input 
+                                    type="text" 
+                                    value={textInput} 
+                                    onChange={(e) => setTextInput(e.target.value)} 
+                                    placeholder="e.g., c3, d2" 
+                                    className="px-4 py-2 border-2 border-slate-300 rounded-lg focus:outline-none focus:border-slate-600 text-center"
+                                />
+                                <button type="submit" className="bg-slate-800 text-white font-bold py-2 rounded-lg hover:bg-slate-700">Submit Moves</button>
+                            </form>
+                        </div>
+                    ) : (
+                        <div className="w-full max-w-sm mb-2">
+                            <Chessboard pieces={[{ pos: knight, type: 'Knight', color: 'White' }]} markers={markers} onSquareClick={handleSquareClick} />
+                        </div>
+                    )}
+                    <button onClick={onExit} className="mt-8 text-slate-500 hover:text-slate-800 underline">Back to Menu</button>
+                </div>
+            );
+        };
+
+        const TriangulationDrill = ({ onExit, isHardcore }) => {
+            const [streak, setStreak] = useState(0);
+            const [puzzle, setPuzzle] = useState(null);
+            const [feedback, setFeedback] = useState("");
+            const [hintUsed, setHintUsed] = useState(false);
+            const [revealedQueen, setRevealedQueen] = useState(null);
+            const [textInput, setTextInput] = useState("");
+
+            const generatePuzzle = useCallback(() => {
+                while (true) {
+                    const qx = Math.floor(Math.random() * 8), qy = Math.floor(Math.random() * 8);
+                    
+                    const rankSqs = [], fileSqs = [], diagSqs = [];
+                    for (let i = 0; i < 8; i++) {
+                        if (i !== qx) rankSqs.push([i, qy]);
+                        if (i !== qy) fileSqs.push([qx, i]);
+                    }
+                    
+                    for (let d = 1; d < 8; d++) {
+                        [[d, d], [d, -d], [-d, d], [-d, -d]].forEach(([dx, dy]) => {
+                            const nx = qx + dx, ny = qy + dy;
+                            if (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 7) diagSqs.push([nx, ny]);
+                        });
+                    }
+                    
+                    const shuffle = arr => [...arr].sort(() => 0.5 - Math.random());
+                    const shuffledRanks = shuffle(rankSqs);
+                    const shuffledFiles = shuffle(fileSqs);
+                    const shuffledDiags = shuffle(diagSqs);
+                    
+                    for (const r of shuffledRanks) {
+                        const d_r = Math.abs(r[0] - qx);
+                        for (const f of shuffledFiles) {
+                            const d_f = Math.abs(f[1] - qy);
+                            if (d_f === d_r) continue;
+                            
+                            for (const d of shuffledDiags) {
+                                const d_d = Math.abs(d[0] - qx);
+                                if (d_d === d_r || d_d === d_f) continue;
+                                
+                                const targets = shuffle([r, f, d]);
+                                setPuzzle({ queen: [qx, qy], targets });
+                                setRevealedQueen(null);
+                                setHintUsed(false);
+                                setFeedback(isHardcore ? "Type the Queen coordinate." : "Find a single square where a Queen attacks all 3 targets.");
+                                setTextInput("");
+                                return;
+                            }
+                        }
+                    }
+                }
+            }, [isHardcore]);
+
+            useEffect(() => generatePuzzle(), [generatePuzzle]);
+
+            if (!puzzle) return <div>Loading...</div>;
+
+            const checkAnswer = (x, y) => {
+                if (puzzle.targets.some(t => t[0] === x && t[1] === y)) {
+                    setFeedback("Queen cannot stand ON a target square!");
+                    return;
+                }
+                
+                // IMPORTANT FIX: Checking if the selected square successfully attacks ALL 3 targets
+                const attacksAll = puzzle.targets.every(t => isQueenAttack(x, y, t[0], t[1]));
+                
+                if (attacksAll) {
+                    setRevealedQueen([x, y]);
+                    setStreak(s => s + 1);
+                    setFeedback(`Correct! Queen on ${toCoord(x,y)} attacks all targets.`);
+                    setTimeout(generatePuzzle, 2000);
+                } else {
+                    setRevealedQueen(puzzle.queen); 
+                    setStreak(0);
+                    setFeedback(`Incorrect. The intended answer was ${toCoord(...puzzle.queen)}.`);
+                    setTimeout(generatePuzzle, 3000);
+                }
+            };
+
+            const handleSquareClick = (x, y) => {
+                if (revealedQueen || isHardcore) return; 
+                checkAnswer(x, y);
+            };
+
+            const handleTextSubmit = (e) => {
+                e.preventDefault();
+                if (revealedQueen) return;
+                const coords = toIdx(textInput);
+                if (!coords) {
+                    setFeedback("Invalid coordinate format.");
+                    return;
+                }
+                checkAnswer(coords[0], coords[1]);
+            };
+
+            const showHint = () => {
+                if (hintUsed) return;
+                setHintUsed(true);
+                const isDark = isDarkSquare(puzzle.queen[0], puzzle.queen[1]);
+                setFeedback(`HINT: The correct Queen square is on a ${isDark ? 'DARK' : 'LIGHT'} square.`);
+            };
+
+            const markers = puzzle.targets.map(t => ({ pos: t, color: 'bg-red-500 opacity-60' }));
+            const pieces = [];
+            if (revealedQueen) {
+                pieces.push({ pos: revealedQueen, type: 'Queen', color: 'White' });
+            }
+
+            return (
+                <div className="flex flex-col items-center w-full space-y-4">
+                    <div className="flex justify-between w-full max-w-md px-2">
+                        <div className="font-bold text-slate-700">Streak: <span className="text-green-600">{streak}</span></div>
+                        <button onClick={showHint} disabled={hintUsed || revealedQueen} className="text-xs font-bold bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 disabled:opacity-50">
+                            Get Hint
+                        </button>
+                    </div>
+
+                    <div className={`text-sm md:text-base font-bold min-h-[1.5rem] text-center ${feedback.includes('Incorrect') ? 'text-red-500' : feedback.includes('Correct') ? 'text-green-600' : 'text-slate-600'}`}>
+                        {feedback}
+                    </div>
+
+                    {isHardcore ? (
+                        <div className="w-full max-w-md bg-white p-6 rounded-xl shadow-md border-2 border-slate-200 text-center">
+                            <div className="text-lg font-bold text-slate-800 mb-6">
+                                Targets: {puzzle.targets.map(t => <span key={`${t[0]},${t[1]}`} className="text-red-600 mx-1">{toCoord(...t)}</span>)}
+                            </div>
+                            <form onSubmit={handleTextSubmit} className="flex flex-col space-y-3">
+                                <input 
+                                    type="text" 
+                                    value={textInput} 
+                                    onChange={(e) => setTextInput(e.target.value)} 
+                                    placeholder="e.g., e4" 
+                                    className="px-4 py-2 border-2 border-slate-300 rounded-lg focus:outline-none focus:border-slate-600 text-center"
+                                />
+                                <button type="submit" className="bg-slate-800 text-white font-bold py-2 rounded-lg hover:bg-slate-700">Submit Square</button>
+                            </form>
+                        </div>
+                    ) : (
+                        <div className="w-full max-w-sm mb-2">
+                            <Chessboard pieces={pieces} markers={markers} onSquareClick={handleSquareClick} disabled={!!revealedQueen} />
+                        </div>
+                    )}
+                    
+                    <button onClick={onExit} className="mt-8 text-slate-500 hover:text-slate-800 underline">Back to Menu</button>
+                </div>
+            );
+        };
+
+        const PathfinderDrill = ({ onExit, isHardcore }) => {
+            const [streak, setStreak] = useState(0);
+            const [gameState, setGameState] = useState(null);
+            const [feedback, setFeedback] = useState("");
+            const [textInput, setTextInput] = useState("");
+            const [playerPiece, setPlayerPiece] = useState('Knight');
+
+            const getTargetPar = (currentStreak) => {
+                if (currentStreak >= 10) return '4+';
+                const r = Math.random();
+                if (currentStreak <= 2) return r <= 0.90 ? 2 : 3;
+                if (currentStreak <= 6) return r <= 0.60 ? 2 : (r <= 0.90 ? 3 : 4);
+                return r <= 0.20 ? 2 : (r <= 0.50 ? 3 : (r <= 0.80 ? 4 : 5));
+            };
+
+            const getGhostPool = (currentStreak) => {
+                let pool = ['Rook', 'Bishop', 'Knight', 'King'];
+                if (currentStreak >= 20) pool.push('Queen');
+                return pool;
+            };
+
+            const generatePuzzle = useCallback((currentStreak, pieceType = playerPiece) => {
+                let targetPar = getTargetPar(currentStreak);
+                const isBossLevel = [5, 10, 15].includes(currentStreak);
+                let numGhosts = currentStreak >= 20 ? 4 : (currentStreak >= 10 ? 3 : (currentStreak >= 6 ? 2 : 1));
+                const ghostPool = getGhostPool(currentStreak);
+                
+                let path = null, start, end, ghosts;
+                let attempts = 0;
+                
+                while (true) {
+                    attempts++;
+                    if (attempts > 500 && !isBossLevel) {
+                        numGhosts = Math.max(1, numGhosts - 1);
+                        attempts = 0;
+                    }
+
+                    start = [Math.floor(Math.random() * 8), Math.floor(Math.random() * 8)];
+                    end = [Math.floor(Math.random() * 8), Math.floor(Math.random() * 8)];
+                    if (start[0] === end[0] && start[1] === end[1]) continue;
+                    
+                    ghosts = [];
+                    
+                    if (currentStreak === 5) {
+                        const darkDiag = [[1,1], [2,2], [5,5], [6,6]]; 
+                        const lightDiag = [[1,6], [2,5], [5,2], [6,1]];
+                        const b1Pos = darkDiag[Math.floor(Math.random() * darkDiag.length)];
+                        const b2Pos = lightDiag[Math.floor(Math.random() * lightDiag.length)];
+                        if ((b1Pos[0] === start[0] && b1Pos[1] === start[1]) || (b1Pos[0] === end[0] && b1Pos[1] === end[1])) continue;
+                        if ((b2Pos[0] === start[0] && b2Pos[1] === start[1]) || (b2Pos[0] === end[0] && b2Pos[1] === end[1])) continue;
+                        ghosts = [{ type: 'Bishop', pos: b1Pos }, { type: 'Bishop', pos: b2Pos }];
+                    } else if (currentStreak === 10) {
+                        while(ghosts.length < 3) {
+                            const gPos = [Math.floor(Math.random() * 8), Math.floor(Math.random() * 8)];
+                            if ((gPos[0] !== start[0] || gPos[1] !== start[1]) && 
+                                (gPos[0] !== end[0] || gPos[1] !== end[1]) &&
+                                !ghosts.some(g => g.pos[0] === gPos[0] && g.pos[1] === gPos[1])) {
+                                ghosts.push({ type: 'Knight', pos: gPos });
+                            }
+                        }
+                    } else {
+                        let hasKing = false;
+                        while(ghosts.length < numGhosts) {
+                            const gPos = [Math.floor(Math.random() * 8), Math.floor(Math.random() * 8)];
+                            if ((gPos[0] !== start[0] || gPos[1] !== start[1]) && 
+                                (gPos[0] !== end[0] || gPos[1] !== end[1]) &&
+                                !ghosts.some(g => g.pos[0] === gPos[0] && g.pos[1] === gPos[1])) {
+                                
+                                const availablePool = ghostPool.filter(p => p !== 'King' || !hasKing);
+                                const type = availablePool[Math.floor(Math.random() * availablePool.length)];
+                                if (type === 'King') hasKing = true;
+                                ghosts.push({ type, pos: gPos });
+                            }
+                        }
+                    }
+
+                    let pawnChance = 0.10;
+                    while (Math.random() < pawnChance && pawnChance > 0) {
+                        const gPos = [Math.floor(Math.random() * 8), Math.floor(Math.random() * 6) + 1]; 
+                        if ((gPos[0] !== start[0] || gPos[1] !== start[1]) && 
+                            (gPos[0] !== end[0] || gPos[1] !== end[1]) &&
+                            !ghosts.some(g => g.pos[0] === gPos[0] && g.pos[1] === gPos[1])) {
+                            ghosts.push({ type: 'Pawn', pos: gPos });
+                            pawnChance -= 0.01;
+                        }
+                    }
+
+                    // IMPORTANT FIX: Guarantee the target and start squares are NOT in ghost lines of sight
+                    const threatMap = generateThreatMap(ghosts);
+                    if (threatMap.has(`${start[0]},${start[1]}`) || threatMap.has(`${end[0]},${end[1]}`)) {
+                        continue; 
+                    }
+                    
+                    path = getShortestPath(start, end, ghosts, pieceType);
+                    
+                    if (path !== null) {
+                        if (isBossLevel) {
+                            let reqPath = currentStreak === 5 ? 3 : 4;
+                            if (attempts > 400) reqPath = 2;
+                            if (path >= reqPath) break;
+                        } else {
+                            if (currentStreak >= 10 && path >= 4) break;
+                            if (currentStreak < 10 && path === targetPar) break;
+                        }
+                    }
+                }
+                
+                setGameState({
+                    start, end, ghosts, current: start, moves: 0, targetPar, threatened: generateThreatMap(ghosts), isBoss: isBossLevel
+                });
+                setFeedback(isHardcore ? "Enter full path coordinates." : isBossLevel ? "💀 DEFEAT THE BOSS! 💀 Navigate to the target." : "Navigate to the target. Avoid Ghost lines of sight!");
+                setTextInput("");
+            }, [isHardcore, playerPiece]);
+
+            useEffect(() => generatePuzzle(0), [generatePuzzle]);
+
+            if (!gameState) return <div>Loading...</div>;
+
+            const handleSquareClick = (x, y) => {
+                if (isHardcore) return;
+                const { current, end, threatened, ghosts, moves, start, targetPar } = gameState;
+                if (x === current[0] && y === current[1]) return;
+
+                const ghostPositions = new Set(ghosts.map(g => `${g.pos[0]},${g.pos[1]}`));
+                
+                let nextMoves = [];
+                if (playerPiece === 'Knight') nextMoves = getKnightMoves(current[0], current[1]);
+                else if (playerPiece === 'Bishop') nextMoves = getBishopMoves(current[0], current[1], ghostPositions);
+                else if (playerPiece === 'Rook') nextMoves = getRookMoves(current[0], current[1], ghostPositions);
+                
+                const isLegalJump = nextMoves.some(m => m[0] === x && m[1] === y);
+                
+                if (!isLegalJump) {
+                    setFeedback(`Illegal ${playerPiece.toLowerCase()} move! Streak reset.`);
+                    setStreak(0);
+                    setGameState({ ...gameState, current: start, moves: 0 });
+                    return;
+                }
+
+                if (threatened.has(`${x},${y}`)) {
+                    setFeedback("BOOM! You stepped into a Ghost's line of sight! Streak reset.");
+                    setStreak(0);
+                    setGameState({ ...gameState, current: start, moves: 0 });
+                    return;
+                }
+
+                const newMoves = moves + 1;
+                if (x === end[0] && y === end[1]) {
+                    setFeedback(`Success! Path found in ${newMoves} moves.`);
+                    setStreak(s => s + 1);
+                    setTimeout(() => generatePuzzle(streak + 1), 1500);
+                } else {
+                    setFeedback("Good move. Keep going.");
+                    setGameState({ ...gameState, current: [x, y], moves: newMoves });
+                }
+            };
+
+            const handlePathSubmit = (e) => {
+                e.preventDefault();
+                const steps = textInput.split(',').map(s => s.trim().toLowerCase()).filter(s => s);
+                const { start, end, threatened, ghosts } = gameState;
+                const ghostPositions = new Set(ghosts.map(g => `${g.pos[0]},${g.pos[1]}`));
+                
+                let curr = start;
+                let movesTaken = 0;
+                
+                for (let i = 0; i < steps.length; i++) {
+                    const sq = steps[i];
+                    const coords = toIdx(sq);
+                    if (!coords) {
+                        setFeedback(`Invalid coordinate format: '${sq}'. Streak reset.`);
+                        setStreak(0);
+                        setGameState({ ...gameState, current: start, moves: 0 });
+                        return;
+                    }
+                    
+                    const [nx, ny] = coords;
+                    
+                    let nextMoves = [];
+                    if (playerPiece === 'Knight') nextMoves = getKnightMoves(curr[0], curr[1]);
+                    else if (playerPiece === 'Bishop') nextMoves = getBishopMoves(curr[0], curr[1], ghostPositions);
+                    else if (playerPiece === 'Rook') nextMoves = getRookMoves(curr[0], curr[1], ghostPositions);
+                    
+                    const isLegalJump = nextMoves.some(m => m[0] === nx && m[1] === ny);
+                    
+                    if (!isLegalJump) {
+                        setFeedback(`Illegal ${playerPiece.toLowerCase()} move to ${sq}! Streak reset.`);
+                        setStreak(0);
+                        setGameState({ ...gameState, current: start, moves: 0 });
+                        return;
+                    }
+                    
+                    if (threatened.has(`${nx},${ny}`)) {
+                        setFeedback(`BOOM! ${sq} is in a Ghost's line of sight! Streak reset.`);
+                        setStreak(0);
+                        setGameState({ ...gameState, current: start, moves: 0 });
+                        return;
+                    }
+                    
+                    curr = [nx, ny];
+                    movesTaken++;
+                }
+                
+                if (curr[0] === end[0] && curr[1] === end[1]) {
+                    setFeedback(`Success! Full path validated in ${movesTaken} moves.`);
+                    setStreak(s => s + 1);
+                    setTimeout(() => generatePuzzle(streak + 1), 1500);
+                } else {
+                    setFeedback(`Path valid, but you ended on ${toCoord(...curr)} instead of ${toCoord(...end)}. Streak reset.`);
+                    setStreak(0);
+                    setGameState({ ...gameState, current: start, moves: 0 });
+                }
+            };
+
+            const pieces = [
+                { pos: gameState.current, type: playerPiece, color: 'White' },
+                ...gameState.ghosts.map(g => ({ 
+                    pos: g.pos, 
+                    type: g.type, 
+                    color: 'Black',
+                    isBoss: gameState.isBoss
+                }))
+            ];
+            
+            const markers = [
+                { pos: gameState.end, color: 'bg-blue-400 opacity-80' },
+            ];
+
+            return (
+                <div className="flex flex-col items-center w-full space-y-4">
+                    <div className="flex justify-between w-full max-w-md px-2 items-center mb-2">
+                        <div className="font-bold text-slate-700">Streak: <span className="text-green-600">{streak}</span></div>
+                        
+                        {/* IMPORTANT FIX: Restored PAR display logic directly below Streak */}
+                        {gameState.isBoss ? (
+                            <div className="text-sm font-black text-purple-600 animate-pulse uppercase tracking-widest">Boss Level</div>
+                        ) : (
+                            <div className="font-bold text-slate-700">
+                                Par: <span className="text-blue-600">{gameState.targetPar}</span>
+                            </div>
+                        )}
+
+                        <div className="flex space-x-1">
+                            {['Knight', 'Bishop', 'Rook'].map(p => (
+                                <button 
+                                    key={p}
+                                    onClick={() => { setPlayerPiece(p); setStreak(0); generatePuzzle(0, p); }}
+                                    className={`px-2 py-1 rounded text-xs font-bold border transition-colors ${playerPiece === p ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500 border-slate-300 hover:bg-slate-100'}`}
+                                >
+                                    {p}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div className={`text-sm md:text-base font-bold min-h-[1.5rem] text-center ${feedback.includes('BOOM') || feedback.includes('Illegal') || feedback.includes('Invalid') ? 'text-red-500' : feedback.includes('Success') ? 'text-green-600' : 'text-slate-600'}`}>
+                        {feedback}
+                    </div>
+
+                    {!isHardcore ? (
+                        <Chessboard pieces={pieces} markers={markers} onSquareClick={handleSquareClick} />
+                    ) : (
+                        <div className="w-full max-w-md bg-white p-6 rounded-xl shadow-md border-2 border-slate-200 text-center">
+                            <div className="mb-4">
+                                <p className="text-lg font-bold text-slate-800">Start: <span className="text-blue-600">{toCoord(...gameState.start)}</span></p>
+                                <p className="text-lg font-bold text-slate-800">Target: <span className="text-blue-600">{toCoord(...gameState.end)}</span></p>
+                                <div className="mt-2 text-sm text-red-600 font-semibold">
+                                    Ghosts: {gameState.ghosts.map(g => `${g.type} on ${toCoord(...g.pos)}`).join(', ')}
+                                </div>
+                            </div>
+                            <form onSubmit={handlePathSubmit} className="flex flex-col space-y-3">
+                                <input 
+                                    type="text" 
+                                    value={textInput} 
+                                    onChange={(e) => setTextInput(e.target.value)} 
+                                    placeholder="e.g., c3, e4, f6" 
+                                    className="px-4 py-2 border-2 border-slate-300 rounded-lg focus:outline-none focus:border-slate-600 text-center"
+                                />
+                                <button type="submit" className="bg-slate-800 text-white font-bold py-2 rounded-lg hover:bg-slate-700">Submit Path</button>
+                            </form>
+                        </div>
+                    )}
+                    <button onClick={onExit} className="mt-4 text-slate-500 hover:text-slate-800 underline">Back to Menu</button>
+                </div>
+            );
+        };
+
+        // --- MAIN APP COMPONENT ---
+        const App = () => {
+            const [view, setView] = useState('menu'); 
+            const [isHardcore, setIsHardcore] = useState(false);
+            const [startLvl, setStartLvl] = useState(1.0);
+            const [activeDrill, setActiveDrill] = useState(null);
+
+            const MenuBtn = ({ title, desc, onClick }) => (
+                <button 
+                    onClick={onClick}
+                    className="w-full text-left p-4 md:p-6 bg-white rounded-xl shadow-sm border-2 border-slate-200 hover:border-slate-800 hover:shadow-md transition group"
+                >
+                    <h3 className="text-lg md:text-xl font-bold text-slate-800 group-hover:text-black">{title}</h3>
+                    <p className="text-sm md:text-base text-slate-500 mt-1">{desc}</p>
+                </button>
+            );
+
+            return (
+                <div className="min-h-screen bg-slate-50 font-sans p-4 md:p-8 flex flex-col items-center text-slate-900 pb-20">
+                    <header className="mb-8 text-center mt-4">
+                        <h1 className="text-3xl md:text-4xl font-black text-slate-800 uppercase tracking-tight">Chess Vision Suite</h1>
+                        {view === 'menu' && (
+                            <div className="mt-4 flex flex-col items-center space-y-2">
+                                <p className="text-slate-500 font-medium">Select a drill to begin training</p>
+                                <label className="flex items-center space-x-2 bg-white px-4 py-2 rounded-full shadow-sm border border-slate-200 cursor-pointer hover:bg-slate-50 transition mt-2">
+                                    <input type="checkbox" checked={isHardcore} onChange={e => setIsHardcore(e.target.checked)} className="accent-red-600 w-4 h-4" />
+                                    <span className="font-bold text-red-600 text-sm">Hardcore Mode (Blindfold)</span>
+                                </label>
+                            </div>
+                        )}
+                    </header>
+
+                    <main className="w-full max-w-4xl flex-1 flex flex-col items-center justify-start">
+                        {view === 'menu' && (
+                            <div className="w-full max-w-2xl grid gap-4">
+                                <MenuBtn title="1. Square Color Drill" desc="Mental map training. Identify if a coordinate is light or dark." onClick={() => setView('color')} />
+                                <MenuBtn title="2. Knight Sight" desc="Find all legal squares a Knight can jump to from its current position." onClick={() => setView('knight')} />
+                                <MenuBtn title="3. Triangulation" desc="The Queen's Crosshair. Find the intersection point that attacks 3 distinct targets." onClick={() => setView('triangulation')} />
+                                <MenuBtn title="4. The Pathfinder" desc="Navigate a minefield. Reach the target while avoiding Ghost piece lines of sight." onClick={() => setView('pathfinder')} />
+                                
+                                <div className="border-t-2 border-slate-200 pt-4 mt-2">
+                                    <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Adaptive Training Engine</div>
+                                    <MenuBtn title="5. Blindfold Tactics (Adaptive)" desc="Deep calculation. Static board. Visualize the 'Fog' moves mentally." onClick={() => { setActiveDrill('bt'); setView('tiers'); }} />
+                                    <div className="mt-4"></div>
+                                    <MenuBtn title="6. Blind Games (Adaptive)" desc="Piece tracking. Use arrow keys to step through a variation with generic circles." onClick={() => { setActiveDrill('bg'); setView('tiers'); }} />
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'tiers' && <TierSelector onSelect={(l) => { setStartLvl(l); setView(activeDrill === 'bg' ? 'blindgames' : 'blindtactics'); }} onBack={() => setView('menu')} />}
+
+                        {view === 'color' && <SquareColorDrill onExit={() => setView('menu')} isHardcore={isHardcore} />}
+                        {view === 'knight' && <KnightSightDrill onExit={() => setView('menu')} isHardcore={isHardcore} />}
+                        {view === 'triangulation' && <TriangulationDrill onExit={() => setView('menu')} isHardcore={isHardcore} />}
+                        {view === 'pathfinder' && <PathfinderDrill onExit={() => setView('menu')} isHardcore={isHardcore} />}
+                        
+                        {view === 'blindtactics' && <BlindTacticDrill onExit={() => setView('menu')} isHardcore={isHardcore} startLevel={startLvl} />}
+                        {view === 'blindgames' && <BlindGameDrill onExit={() => setView('menu')} isHardcore={isHardcore} startLevel={startLvl} />}
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
