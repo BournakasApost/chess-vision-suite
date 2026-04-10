@@ -345,9 +345,15 @@
                 <button onClick={onBack} className="mt-8 text-slate-500 hover:text-slate-800 underline">Back to Menu</button>
             </div>
         );
-
+        // --- SIMPLE LICHESS LINK ---
+        const openLichess = (fen) => {
+            // Lichess URLs prefer underscores instead of spaces for FEN strings
+            const encodedFen = fen.replace(/ /g, '_');
+            window.open(`https://lichess.org/analysis/${encodedFen}`, '_blank');
+        };
 
         // --- ADAPTIVE DRILLS ---
+
 
         const BlindGameDrill = ({ onExit, isHardcore, startLevel }) => {
             const { currentLevel, getNextPuzzle, updateLevel } = useAdaptiveEngine(BLIND_GAMES, startLevel);
@@ -359,7 +365,6 @@
             const [feedback, setFeedback] = useState("");
             const [inputVal, setInputVal] = useState("");
             
-            // Interaction State: 'playing', 'strike1', 'revealed'
             const [attemptState, setAttemptState] = useState('playing');
             const [shakeError, setShakeError] = useState(false);
 
@@ -383,7 +388,7 @@
             }, [puzzle, loadNewPuzzle, currentLevel]);
 
             useEffect(() => {
-                if (isHardcore || !puzzle) return;
+                if (isHardcore || !puzzle || attemptState === 'revealed') return;
                 const handleKeyDown = (e) => {
                     if (e.key === 'ArrowRight' && moveIndex < puzzle.moves.length) {
                         chessEngine.move(puzzle.moves[moveIndex]);
@@ -397,11 +402,19 @@
                 };
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [moveIndex, puzzle, chessEngine, isHardcore]);
+            }, [moveIndex, puzzle, chessEngine, isHardcore, attemptState]);
 
             const triggerShake = () => {
                 setShakeError(false);
                 setTimeout(() => setShakeError(true), 10);
+            };
+
+            const revealBoard = () => {
+                const temp = new Chess(puzzle.fen);
+                puzzle.moves.forEach(m => temp.move(m));
+                setCurrentFen(temp.fen());
+                setMoveIndex(puzzle.moves.length);
+                setAttemptState('revealed');
             };
 
             const handleSubmit = (e) => {
@@ -414,14 +427,11 @@
                     if (attemptState === 'playing') {
                         setFeedback("Perfect! Clean calculation. (+0.4)");
                         updateLevel(0.4);
-                        setAttemptState('revealed');
-                        setTimeout(() => loadNewPuzzle(currentLevel + 0.4), 2000);
                     } else {
                         setFeedback("Correct! Good recovery. (-0.4)");
                         updateLevel(-0.4);
-                        setAttemptState('revealed');
-                        setTimeout(() => loadNewPuzzle(currentLevel - 0.4), 2000);
                     }
+                    revealBoard();
                 } else {
                     triggerShake();
                     if (attemptState === 'playing') {
@@ -430,8 +440,7 @@
                     } else {
                         setFeedback(`Incorrect. Solution was ${puzzle.solution}. (-1.0)`);
                         updateLevel(-1.0);
-                        setAttemptState('revealed');
-                        setTimeout(() => loadNewPuzzle(currentLevel - 1.0), 3500);
+                        revealBoard();
                     }
                 }
             };
@@ -458,7 +467,7 @@
                                     <p className="text-slate-500 text-sm">Visualize the variation entirely in your mind.</p>
                                 </div>
                             ) : (
-                                <Chessboard pieces={getPiecesFromFEN(currentFen)} renderMode="circles" />
+                                <Chessboard pieces={getPiecesFromFEN(currentFen)} renderMode={attemptState === 'revealed' ? 'normal' : 'circles'} />
                             )}
                         </div>
 
@@ -484,22 +493,29 @@
                                             disabled={attemptState === 'revealed'}
                                             className="px-4 py-3 border-2 border-blue-300 rounded-lg focus:outline-none focus:border-blue-600 text-center font-bold w-full disabled:opacity-50"
                                         />
-                                        <button type="submit" disabled={attemptState === 'revealed'} className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition disabled:opacity-50">Submit Answer</button>
+                                        {attemptState === 'revealed' ? (
+                                            <div className="flex space-x-2">
+                                                <button type="button" onClick={() => openLichess(currentFen)} className="flex-1 bg-purple-600 text-white font-bold py-3 rounded-lg hover:bg-purple-700 transition shadow-md">🔍 Analyze</button>
+                                                <button type="button" onClick={() => loadNewPuzzle(currentLevel)} className="flex-1 bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow-md">Next ➡️</button>
+                                            </div>
+                                        ) : (
+                                            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">Submit Answer</button>
+                                        )}
                                     </form>
                                 </div>
                             )}
                         </div>
                     </div>
-
                     <button onClick={onExit} className="mt-8 text-slate-500 hover:text-slate-800 underline">Back to Menu</button>
                 </div>
             );
         };
 
-        const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
+const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
             const { currentLevel, getNextPuzzle, updateLevel } = useAdaptiveEngine(BLIND_TACTICS, startLevel);
             
             const [puzzle, setPuzzle] = useState(null);
+            const [currentFen, setCurrentFen] = useState('');
             const [feedback, setFeedback] = useState("");
             const [inputVal, setInputVal] = useState("");
             const [hintRevealed, setHintRevealed] = useState(!isHardcore);
@@ -511,6 +527,7 @@
                 const nextPuzz = getNextPuzzle(targetLvl);
                 if (nextPuzz) {
                     setPuzzle(nextPuzz);
+                    setCurrentFen(nextPuzz.fen);
                     setFeedback("Visualize the Fog moves. What is the winning reply?");
                     setInputVal("");
                     setHintRevealed(!isHardcore);
@@ -529,6 +546,16 @@
                 setTimeout(() => setShakeError(true), 10);
             };
 
+            const flatFogMoves = puzzle ? puzzle.fog.join(' ').replace(/\d+\.\s*/g, '').split(' ').filter(Boolean) : [];
+
+            const revealBoard = () => {
+                const temp = new Chess(puzzle.fen);
+                flatFogMoves.forEach(m => temp.move(m));
+                temp.move(puzzle.solution);
+                setCurrentFen(temp.fen());
+                setAttemptState('revealed');
+            };
+
             const handleSubmit = (e) => {
                 e.preventDefault();
                 if (attemptState === 'revealed') return;
@@ -539,14 +566,11 @@
                     if (attemptState === 'playing') {
                         setFeedback("Perfect! Tactical vision is sharp. (+0.4)");
                         updateLevel(0.4);
-                        setAttemptState('revealed');
-                        setTimeout(() => loadNewPuzzle(currentLevel + 0.4), 2000);
                     } else {
                         setFeedback("Correct! Good recovery. (-0.4)");
                         updateLevel(-0.4);
-                        setAttemptState('revealed');
-                        setTimeout(() => loadNewPuzzle(currentLevel - 0.4), 2000);
                     }
+                    revealBoard();
                 } else {
                     triggerShake();
                     if (attemptState === 'playing') {
@@ -555,14 +579,12 @@
                     } else {
                         setFeedback(`Incorrect. Solution was ${puzzle.solution}. (-1.0)`);
                         updateLevel(-1.0);
-                        setAttemptState('revealed');
-                        setTimeout(() => loadNewPuzzle(currentLevel - 1.0), 3500);
+                        revealBoard();
                     }
                 }
             };
 
             if (!puzzle) return <div className="text-slate-500 font-bold mt-10">Loading Database...</div>;
-            const flatFogMoves = puzzle.fog.join(' ').replace(/\d+\.\s*/g, '').split(' ').filter(Boolean);
 
             return (
                 <div className="flex flex-col items-center w-full">
@@ -584,7 +606,7 @@
 
                     <div className="flex flex-col md:flex-row items-center md:items-start justify-center gap-8 w-full max-w-4xl px-4">
                         <div className="w-full max-w-sm shrink-0 order-1">
-                            <Chessboard pieces={getPiecesFromFEN(puzzle.fen)} renderMode="normal" />
+                            <Chessboard pieces={getPiecesFromFEN(currentFen)} renderMode="normal" />
                         </div>
                         
                         <div className="w-full md:w-80 flex flex-col space-y-4 shrink-0 order-2">
@@ -611,7 +633,14 @@
                                     disabled={attemptState === 'revealed'}
                                     className="px-4 py-4 border-2 border-slate-300 rounded-xl focus:outline-none focus:border-slate-800 text-center font-bold shadow-inner w-full disabled:opacity-50"
                                 />
-                                <button type="submit" disabled={attemptState === 'revealed'} className="w-full bg-slate-800 text-white font-bold py-4 rounded-xl hover:bg-slate-700 transition shadow-md disabled:opacity-50">Execute Move</button>
+                                {attemptState === 'revealed' ? (
+                                    <div className="flex space-x-2">
+                                        <button type="button" onClick={() => openLichess(currentFen)} className="flex-1 bg-purple-600 text-white font-bold py-4 rounded-xl hover:bg-purple-700 transition shadow-md">🔍 Analyze</button>
+                                        <button type="button" onClick={() => loadNewPuzzle(currentLevel)} className="flex-1 bg-slate-800 text-white font-bold py-4 rounded-xl hover:bg-slate-700 transition shadow-md">Next ➡️</button>
+                                    </div>
+                                ) : (
+                                    <button type="submit" className="w-full bg-slate-800 text-white font-bold py-4 rounded-xl hover:bg-slate-700 transition shadow-md">Execute Move</button>
+                                )}
                             </form>
                         </div>
                     </div>
@@ -620,7 +649,6 @@
                 </div>
             );
         };
-
         // --- NON-ADAPTIVE MINIGAMES ---
         const SquareColorDrill = ({ onExit, isHardcore }) => {
             const [streak, setStreak] = useState(0);
