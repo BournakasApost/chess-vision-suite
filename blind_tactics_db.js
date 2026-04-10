@@ -188,4 +188,257 @@ window.BLIND_TACTICS_DB = [
         fog: ['1.Bb3 Rd7',],
         solution: 'Rc8+'
      },
+    {
+        id: 'bt-22',
+        type: 'BlindTactic',
+        difficulty: 5,
+        theme: 'Winning Material',
+        fen: 'q3r1k1/2p1Qpp1/p4n1p/8/8/3R1PP1/2r1P1KP/3R1B2 w - - 0 1',
+        fog: ['1.Rd8 Kh7',],
+        solution: 'Qxe8'
+     },
+    {
+        id: 'bt-23',
+        type: 'BlindTactic',
+        difficulty: 3,
+        theme: 'Winning Material',
+        fen: '8/5b2/4k1p1/2R4p/p2p3P/1r1B2P1/1P1K4/8 w - - 0 1',
+        fog: ['1.Bc4+ Kd6',],
+        solution: 'Bxb3'
+     },
+    {
+        id: 'bt-24',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Winning Material',
+        fen: '2r4k/3R2p1/p1q4p/1p1Qp3/8/7P/PP4PK/8 w - - 0 1',
+        fog: ['1.Rd8+ Kh7',],
+        solution: 'Qg8+'
+     },
+    {
+        id: 'bt-25',
+        type: 'BlindTactic',
+        difficulty: 3,
+        theme: 'Winning Material',
+        fen: 'r1bq1rk1/2pn2bp/p1n2ppB/1p2p3/4P2P/2N2N2/PPPQBPP1/2KR3R w - - 0 1',
+        fog: ['1.Qd5+ Rf7',],
+        solution: 'Bxg7'
+     },
+    {
+        id: 'bt-26',
+        type: 'BlindTactic',
+        difficulty: 5,
+        theme: 'Winning Material',
+        fen: '6k1/p6p/6p1/5p2/2nn1P2/3N4/r5PP/1R3BK1 w - - 0 1',
+        fog: ['1.Nb4 Nd2',],
+        solution: 'Bc4+'
+     },
+    {
+        id: 'bt-27',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Winning Material',
+        fen: '4q1k1/2Rb2p1/4pp1p/8/1r1Bp3/4P2P/5PP1/Q5K1 w - - 0 1',
+        fog: ['1.Qa7 Qb8',],
+        solution: 'Qxb8+'
+     },
+    {
+        id: 'bt-28',
+        type: 'BlindTactic',
+        difficulty: 5,
+        theme: 'Winning Material',
+        fen: '5rk1/1p1n1pp1/6p1/1q2p3/3p2QP/1P4B1/P1PR1PP1/6K1 b - - 0 1',
+        fog: ['1... Rc8', '2.Bxe5'],
+        solution: 'f5'
+     },
+    {
+        id: 'bt-29',
+        type: 'BlindTactic',
+        difficulty: 1,
+        theme: 'Winning Material',
+        fen: 'R1b2r1k/1p4pp/5b2/5N2/8/4B1P1/7P/6K1 w - - 0 1',
+        fog: ['1.Nd6 Be7',],
+        solution: 'Nxc8'
+     },
+    {
+        id: 'bt-30',
+        type: 'BlindTactic',
+        difficulty: 4,
+        theme: 'Winning Material',
+        fen: 'R1b2r1k/1p4pp/8/4P3/2N2b2/7P/2B3P1/7K w - - 0 1',
+        fog: ['1.Nd6 Bxe5',],
+        solution: 'Nf7+'
+     },
+    {
+        id: 'bt-31',
+        type: 'BlindTactic',
+        difficulty: 5,
+        theme: 'Winning Material',
+        fen: '8/pq4pk/1n1P1p1p/8/2pQ4/7B/P4PPP/6K1 w - - 0 1',
+        fog: ['1.d7 Nxb7',],
+        solution: 'Bf5+'
+     },
+    {
+        id: 'bt-32',
+        type: 'BlindTactic',
+        difficulty: 5,
+        theme: 'Winning Material',
+        fen: '2r5/pp3rbk/3p1n1p/3P4/1P4p1/1q1P2P1/4Q2P/3R1RBK w - - 0 1',
+        fog: ['1.Qe6 Re7',],
+        solution: 'Qf5+'
+     },
+    {
+        id: 'bt-33',
+        type: 'BlindTactic',
+        difficulty: 4,
+        theme: 'Winning Material',
+        fen: '1q6/rPr2pk1/4p1p1/1R1pP1Pp/pQ6/8/5PP1/1R4K1 w - - 0 1',
+        fog: ['1.Qd6 Raxb7',],
+        solution: 'Rxb7'
+     },
+    {
+        id: 'bt-34',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Winning Material',
+        fen: '8/2Ppk2p/pr2b1p1/4N3/5P2/P7/PK1R4/8 w - - 0 1',
+        fog: ['1.Ka1 Bf5',],
+        solution: 'c8=N+'
+     },
+    {
+        id: 'bt-35',
+        type: 'BlindTactic',
+        difficulty: 3,
+        theme: 'Winning Material',
+        fen: 'r1r3k1/3R1p2/p5pp/1pq5/3QP3/7P/PP4P1/R5K1 w - - 0 1',
+        fog: ['1.Rd8+ Kh7',],
+        solution: 'Rh8+'
+     },
+    {
+        id: 'bt-36',
+        type: 'BlindTactic',
+        difficulty: 5,
+        theme: 'Winning Material',
+        fen: '3b3k/4n1p1/1p1p1p2/1p1q4/3B1p2/1PQ4P/2P1BPP1/6K1 b - - 0 1',
+        fog: ['1... Nc6', '2.Bf3'],
+        solution: 'Nxd4'
+     },
+    {
+        id: 'bt-37',
+        type: 'BlindTactic',
+        difficulty: 3,
+        theme: 'Winning Material',
+        fen: '4q1k1/p4p2/1p6/5Npp/n3r1P1/P4Q1P/1P4P1/R5K1 w - - 0 1',
+        fog: ['1.Nd6 Re1+',],
+        solution: 'Kf2'
+     },
+    {
+        id: 'bt-38',
+        type: 'BlindTactic',
+        difficulty: 4,
+        theme: 'Winning Material',
+        fen: '4r2r/1pp1q1k1/p2ppRpp/4p3/1P2P2Q/2PPP3/P5PP/R5K1 w - - 0 1',
+        fog: ['1.Raf1 Rhf8',],
+        solution: 'Rxf8'
+     },
+    {
+        id: 'bt-39',
+        type: 'BlindTactic',
+        difficulty: 4,
+        theme: 'Winning Material',
+        fen: 'r5k1/2q2pp1/1p2p2p/8/P3p3/P1R2QP1/5P1P/5K2 w - - 0 1',
+        fog: ['1.Qxe4 Rxa4',],
+        solution: 'Qc2'
+     },
+     {
+        id: 'bt-40',
+        type: 'BlindTactic',
+        difficulty: 1,
+        theme: 'Eliminating the defence',
+        fen: 'r1b2rk1/pp3pp1/2p2n1p/q2p4/n2P4/2PBPNB1/P1Q2PPP/R4RK1 w - - 0 1',
+        fog: ['1.Bd6 Rd8',],
+        solution: 'Bb4'
+     },
+     {
+        id: 'bt-41',
+        type: 'BlindTactic',
+        difficulty: 1,
+        theme: 'Eliminating the defence',
+        fen: 'rq1r2k1/pp1bbp1p/3p2p1/4np2/2P5/N1N3P1/PP1Q1PBP/R3R1K1 w - - 0 1',
+        fog: ['1.f4 Nc6',],
+        solution: 'Bxc6'
+     },
+     {
+        id: 'bt-42',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Eliminating the defence',
+        fen: 'r1bqk2r/p3b1pp/1pn5/2ppPp2/N3n3/5N2/PPQPBPPP/R1B2RK1 w kq - 0 1',
+        fog: ['1.Bb5 Bd7',],
+        solution: 'e6'
+     },
+     {
+        id: 'bt-43',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Eliminating the defence',
+        fen: 'r3k2r/1pp2pp1/p2p1nb1/2q1p1B1/2N1P1P1/3P1P2/PPP3K1/R2Q1R2 b kq - 0 1',
+        fog: ['1.... b5', '2.Ne3'],
+        solution: 'Nh7'
+     },
+     {
+        id: 'bt-44',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Eliminating the defence',
+        fen: '5rr1/2p1q1k1/1p1p1pn1/pPb1pBpR/P1Q1P3/4PNP1/5PK1/2R5 w - - 0 1',
+        fog: ['1.Rch1 Rh8', ],
+        solution: 'Bxg6'
+     },
+     {
+        id: 'bt-45',
+        type: 'BlindTactic',
+        difficulty: 3,
+        theme: 'Eliminating the defence',
+        fen: '2kr4/ppp3pp/4rp2/3nPq2/7R/1QP3BP/P4PP1/4R1K1 w - - 0 1',
+        fog: ['1.Rd4 Nb6',],
+        solution: 'Rf4'
+     },
+     {
+        id: 'bt-46',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Eliminating the defence',
+        fen: 'r3kn1r/pp1qb1pp/2p1p3/3p4/3Q4/5N2/PPP2PPP/R1B2RK1 w kq - 0 1',
+        fog: ['1.Qxg7 Ng6',],
+        solution: 'Ne5'
+     },
+     {
+        id: 'bt-47',
+        type: 'BlindTactic',
+        difficulty: 3,
+        theme: 'Eliminating the defence',
+        fen: '1r2r1k1/2q1bppp/p1n1bn2/4p3/R3P3/1NN1BB2/1PP2QPP/5R1K b - - 0 1',
+        fog: ['1.... Nb4', '2.Rfa1'],
+        solution: 'Nxc2'
+     },
+     {
+        id: 'bt-48',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Eliminating the defence',
+        fen: '5k2/p1n1q2p/1p4p1/1B3pP1/P3pP2/8/1P3P2/1KBR4 w - - 0 1',
+        fog: ['1.Rd7 Qc5',],
+        solution: 'Be3'
+     },
+     {
+        id: 'bt-49',
+        type: 'BlindTactic',
+        difficulty: 1,
+        theme: 'Eliminating the defence',
+        fen: '5rk1/1p1qnppp/p3p3/8/1PBP2n1/P7/2Q2PPP/2B2RK1 w - - 0 1',
+        fog: ['1.Qe2 Qxd4',],
+        solution: 'Rd1'
+     },
+
 ];
