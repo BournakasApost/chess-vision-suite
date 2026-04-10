@@ -440,5 +440,113 @@ window.BLIND_TACTICS_DB = [
         fog: ['1.Qe2 Qxd4',],
         solution: 'Rd1'
      },
+     {
+        id: 'bt-50',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Pin',
+        fen: '4q1k1/pQ3pp1/1p2p2p/r1nn4/8/P5P1/1B3P1P/3RR1K1 w - - 1 2',
+        fog: ['1.Qxb7 Nc5',],
+        solution: 'Qxd5'
+     },
+     {
+        id: 'bt-51',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Pin',
+        fen: '8/4k2p/p7/1p1K4/rP5P/4b3/7R/4B3 w - - 0 1',
+        fog: ['1.Re2 Ra3',],
+        solution: 'Bf2'
+     },
+     {
+        id: 'bt-52',
+        type: 'BlindTactic',
+        difficulty: 3,
+        theme: 'Pin',
+        fen: '2r3k1/1pB4p/1p2p1p1/3bR3/3P4/1P5P/Pb2NPP1/6K1 w - - 0 1',
+        fog: ['1.Bxb6 Rc6','2.Bc5'],
+        solution: 'Rxc5'
+     },
+     {
+        id: 'bt-53',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Pin',
+        fen: 'r1bq1rk1/p3ppbp/2p3p1/8/3B4/2Q2P2/PPP3PP/2KR1B1R b - - 0 1',
+        fog: ['1.... Bh6+', '2.Kb1'],
+        solution: 'e5'
+     },
+     {
+        id: 'bt-54',
+        type: 'BlindTactic',
+        difficulty: 1,
+        theme: 'Pin',
+        fen: '2k1r3/pp3p1p/2n3bp/5n2/2B5/5N1P/PPP2NPK/4R3 b - - 0 1',
+        fog: ['1.... Ne3',],
+        solution: 'Nd1'
+     },
+     {
+        id: 'bt-55',
+        type: 'BlindTactic',
+        difficulty: 4,
+        theme: 'Pin',
+        fen: 'rn1qk2r/pp1b1ppp/3b1n2/1B1p4/3P4/3Q1N2/PP1N1PPP/R1B1K2R b KQkq - 0 1',
+        fog: ['1.... Qe7+', '2.Qe2 Bxb5'],
+        solution: 'Bxb5'
+     },
+     {
+        id: 'bt-56',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Pin',
+        fen: 'r3k2r/pppqbppp/2n3n1/6N1/4P3/1Q6/PPPB1PPP/R3KB1R b KQkq - 0 1',
+        fog: ['1.... O-O-O', '2.O-O-O'],
+        solution: 'Bxg5'
+     },
+     {
+        id: 'bt-57',
+        type: 'BlindTactic',
+        difficulty: 1,
+        theme: 'Pin',
+        fen: '2R4k/1p4pp/1Q6/p2b4/P7/5r2/5PNK/q7 b - - 0 1',
+        fog: ['1.... Bg8',],
+        solution: 'Qe6'
+     },
+     {
+        id: 'bt-58',
+        type: 'BlindTactic',
+        difficulty: 1,
+        theme: 'Pin',
+        fen: 'r1b3k1/2p4p/pn1p3B/3Ppq2/P5p1/2N5/P2Q2PP/1R4K1 b - - 0 1',
+        fog: ['1.... Rb8',],
+        solution: 'Rf1'
+     },
+     {
+        id: 'bt-59',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Pin',
+        fen: '8/1p2r1kp/p1P5/4b3/8/7P/2Q3P1/7K b - - 0 1',
+        fog: ['1.... bxc6', '2.Qxc6'],
+        solution: 'Rc7'
+     },
+     {
+        id: 'bt-60',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Pin',
+        fen: '3r4/1pRn1k2/p4pp1/3p2p1/4n3/B2B4/P4PPP/6K1 b - - 0 1',
+        fog: ['1.... Ke8',],
+        solution: 'f3'
+     },
+     {
+        id: 'bt-61',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Pin',
+        fen: '2R5/1p2kpb1/r1n1pNpp/3pP3/3r1P2/P7/6PP/1R4K1 b - - 0 1',
+        fog: ['1.... Nd8',],
+        solution: 'Rxb7+'
+     },
 
 ];
