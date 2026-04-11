@@ -355,7 +355,7 @@
         // --- ADAPTIVE DRILLS ---
 
 
-        const BlindGameDrill = ({ onExit, isHardcore, startLevel }) => {
+const BlindGameDrill = ({ onExit, isHardcore, startLevel }) => {
             const { currentLevel, getNextPuzzle, updateLevel } = useAdaptiveEngine(BLIND_GAMES, startLevel);
             
             const [puzzle, setPuzzle] = useState(null);
@@ -368,6 +368,10 @@
             const [attemptState, setAttemptState] = useState('playing');
             const [shakeError, setShakeError] = useState(false);
 
+            // NEW: Conversational State
+            const [stepIndex, setStepIndex] = useState(0);
+            const [extraMoves, setExtraMoves] = useState([]);
+
             const loadNewPuzzle = useCallback((targetLvl) => {
                 const nextPuzz = getNextPuzzle(targetLvl);
                 if (nextPuzz) {
@@ -378,6 +382,8 @@
                     setFeedback(isHardcore ? "Visualize the moves from the text." : "Use Arrow Keys to play the variation.");
                     setInputVal("");
                     setAttemptState('playing');
+                    setStepIndex(0);
+                    setExtraMoves([]);
                 } else {
                     setFeedback("Database empty! Please add puzzles to blind_games_db.js");
                 }
@@ -387,11 +393,13 @@
                 if (!puzzle) loadNewPuzzle(currentLevel);
             }, [puzzle, loadNewPuzzle, currentLevel]);
 
+            const totalMoves = puzzle ? [...puzzle.moves, ...extraMoves] : [];
+
             useEffect(() => {
                 if (isHardcore || !puzzle || attemptState === 'revealed') return;
                 const handleKeyDown = (e) => {
-                    if (e.key === 'ArrowRight' && moveIndex < puzzle.moves.length) {
-                        chessEngine.move(puzzle.moves[moveIndex]);
+                    if (e.key === 'ArrowRight' && moveIndex < totalMoves.length) {
+                        chessEngine.move(totalMoves[moveIndex]);
                         setCurrentFen(chessEngine.fen());
                         setMoveIndex(prev => prev + 1);
                     } else if (e.key === 'ArrowLeft' && moveIndex > 0) {
@@ -402,18 +410,18 @@
                 };
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [moveIndex, puzzle, chessEngine, isHardcore, attemptState]);
+            }, [moveIndex, puzzle, chessEngine, isHardcore, attemptState, totalMoves]);
 
             const triggerShake = () => {
                 setShakeError(false);
                 setTimeout(() => setShakeError(true), 10);
             };
 
-            const revealBoard = () => {
+            const revealBoard = (finalMoves) => {
                 const temp = new Chess(puzzle.fen);
-                puzzle.moves.forEach(m => temp.move(m));
+                finalMoves.forEach(m => temp.move(m));
                 setCurrentFen(temp.fen());
-                setMoveIndex(puzzle.moves.length);
+                setMoveIndex(finalMoves.length);
                 setAttemptState('revealed');
             };
 
@@ -421,32 +429,53 @@
                 e.preventDefault();
                 if (attemptState === 'revealed') return;
 
-                const isCorrect = inputVal.trim().toLowerCase() === puzzle.solution.toLowerCase();
+                const solutionArray = Array.isArray(puzzle.solution) ? puzzle.solution : [puzzle.solution];
+                const expectedMove = solutionArray[stepIndex];
 
-                if (isCorrect) {
-                    if (attemptState === 'playing') {
-                        setFeedback("Perfect! Clean calculation. (+0.4)");
-                        updateLevel(0.4);
+                if (inputVal.trim().toLowerCase() === expectedMove.toLowerCase()) {
+                    const nextStep = stepIndex + 1;
+                    const opponentReply = solutionArray[nextStep];
+
+                    if (opponentReply) {
+                        // CONVERSATION CONTINUES
+                        const newExtraMoves = [...extraMoves, expectedMove, opponentReply];
+                        setExtraMoves(newExtraMoves);
+                        setStepIndex(nextStep + 1);
+                        setFeedback(`Correct! Opponent plays ${opponentReply}. Your turn.`);
+                        setInputVal("");
+                        
+                        // Fast-forward board
+                        const temp = new Chess(puzzle.fen);
+                        [...puzzle.moves, ...newExtraMoves].forEach(m => temp.move(m));
+                        setCurrentFen(temp.fen());
+                        setMoveIndex(puzzle.moves.length + newExtraMoves.length);
                     } else {
-                        setFeedback("Correct! Good recovery. (-0.4)");
-                        updateLevel(-0.4);
+                        // SEQUENCE COMPLETE
+                        const finalMoves = [...puzzle.moves, ...extraMoves, expectedMove];
+                        if (attemptState === 'playing') {
+                            setFeedback("Perfect! Calculation complete. (+0.4)");
+                            updateLevel(0.4);
+                        } else {
+                            setFeedback("Correct! Good recovery. (-0.4)");
+                            updateLevel(-0.4);
+                        }
+                        revealBoard(finalMoves);
                     }
-                    revealBoard();
                 } else {
                     triggerShake();
                     if (attemptState === 'playing') {
-                        setFeedback("Incorrect. Double-check your vision! (Strike 1)");
+                        setFeedback("Incorrect. Re-check your line! (Strike 1)");
                         setAttemptState('strike1');
                     } else {
-                        setFeedback(`Incorrect. Solution was ${puzzle.solution}. (-1.0)`);
+                        setFeedback(`Incorrect. Main line was: ${solutionArray.join(', ')} (-1.0)`);
                         updateLevel(-1.0);
-                        revealBoard();
+                        revealBoard([...puzzle.moves, ...extraMoves, solutionArray[stepIndex]]); // Show intended move
                     }
                 }
             };
 
             if (!puzzle) return <div className="text-slate-500 font-bold mt-10">Loading Database...</div>;
-            const isVariationComplete = moveIndex === puzzle.moves.length;
+            const isVariationComplete = moveIndex >= puzzle.moves.length;
 
             return (
                 <div className="flex flex-col items-center w-full">
@@ -475,9 +504,9 @@
                             <div className="bg-white p-6 rounded-xl shadow-md border-2 border-slate-200 text-center w-full">
                                 <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Variation Line</div>
                                 {isHardcore ? (
-                                    <Scoresheet moves={puzzle.moves} />
+                                    <Scoresheet moves={totalMoves} />
                                 ) : (
-                                    <Scoresheet moves={puzzle.moves.slice(0, moveIndex)} activeIndex={moveIndex - 1} />
+                                    <Scoresheet moves={totalMoves.slice(0, moveIndex)} activeIndex={moveIndex - 1} />
                                 )}
                             </div>
 
@@ -495,11 +524,11 @@
                                         />
                                         {attemptState === 'revealed' ? (
                                             <div className="flex space-x-2">
-                                                <button type="button" onClick={() => openLichess(currentFen)} className="flex-1 bg-purple-600 text-white font-bold py-3 rounded-lg hover:bg-purple-700 transition shadow-md">🔍 Analyze</button>
+                                                <button type="button" onClick={() => openLichess(puzzle.fen)} className="flex-1 bg-purple-600 text-white font-bold py-3 rounded-lg hover:bg-purple-700 transition shadow-md">🔍 Analyze</button>
                                                 <button type="button" onClick={() => loadNewPuzzle(currentLevel)} className="flex-1 bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow-md">Next ➡️</button>
                                             </div>
                                         ) : (
-                                            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition">Submit Answer</button>
+                                            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow-md">Submit Move</button>
                                         )}
                                     </form>
                                 </div>
@@ -523,6 +552,9 @@ const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
             const [attemptState, setAttemptState] = useState('playing');
             const [shakeError, setShakeError] = useState(false);
 
+            const [stepIndex, setStepIndex] = useState(0);
+            const [extraFog, setExtraFog] = useState([]);
+
             const loadNewPuzzle = useCallback((targetLvl) => {
                 const nextPuzz = getNextPuzzle(targetLvl);
                 if (nextPuzz) {
@@ -532,6 +564,8 @@ const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
                     setInputVal("");
                     setHintRevealed(!isHardcore);
                     setAttemptState('playing');
+                    setStepIndex(0);
+                    setExtraFog([]);
                 } else {
                     setFeedback("Database empty! Please add puzzles to blind_tactics_db.js");
                 }
@@ -546,12 +580,12 @@ const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
                 setTimeout(() => setShakeError(true), 10);
             };
 
-            const flatFogMoves = puzzle ? puzzle.fog.join(' ').replace(/\d+\.\s*/g, '').split(' ').filter(Boolean) : [];
+            const flatFogMoves = puzzle ? [...puzzle.fog.join(' ').replace(/\d+\.\s*/g, '').split(' ').filter(Boolean), ...extraFog] : [];
 
-            const revealBoard = () => {
+            const revealBoard = (finalMove) => {
                 const temp = new Chess(puzzle.fen);
                 flatFogMoves.forEach(m => temp.move(m));
-                temp.move(puzzle.solution);
+                if (finalMove) temp.move(finalMove);
                 setCurrentFen(temp.fen());
                 setAttemptState('revealed');
             };
@@ -560,31 +594,60 @@ const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
                 e.preventDefault();
                 if (attemptState === 'revealed') return;
 
-                const isCorrect = inputVal.trim().toLowerCase() === puzzle.solution.toLowerCase();
+                const solutionArray = Array.isArray(puzzle.solution) ? puzzle.solution : [puzzle.solution];
+                const expectedMove = solutionArray[stepIndex];
+                
+                // NEW: Get alternatives for this specific step (defaults to empty array if none exist)
+                const stepAlternatives = (puzzle.alternatives && puzzle.alternatives[stepIndex]) ? puzzle.alternatives[stepIndex] : [];
+                
+                const normalizedInput = inputVal.trim().toLowerCase();
+                const isMainLine = normalizedInput === expectedMove.toLowerCase();
+                const isAlternative = stepAlternatives.some(alt => alt.toLowerCase() === normalizedInput);
 
-                if (isCorrect) {
-                    if (attemptState === 'playing') {
-                        setFeedback("Perfect! Tactical vision is sharp. (+0.4)");
-                        updateLevel(0.4);
+                if (isMainLine) {
+                    const nextStep = stepIndex + 1;
+                    const opponentReply = solutionArray[nextStep];
+
+                    if (opponentReply) {
+                        setExtraFog(prev => [...prev, expectedMove, opponentReply]);
+                        setStepIndex(nextStep + 1);
+                        setFeedback(`Correct! Opponent plays ${opponentReply}. Keep going!`);
+                        setInputVal("");
                     } else {
-                        setFeedback("Correct! Good recovery. (-0.4)");
-                        updateLevel(-0.4);
+                        if (attemptState === 'playing') {
+                            setFeedback("Perfect! Tactical vision is sharp. (+0.4)");
+                            updateLevel(0.4);
+                        } else {
+                            setFeedback("Correct! Good recovery. (-0.4)");
+                            updateLevel(-0.4);
+                        }
+                        revealBoard(expectedMove);
                     }
-                    revealBoard();
+                } else if (isAlternative) {
+                    // NEW: The "Gentle Coach" Intervention
+                    setFeedback("Alternative move! That works too, but there is a more forcing line. Try again.");
+                    setInputVal("");
+                    // Notice we DO NOT trigger a shake or drop the level here!
                 } else {
                     triggerShake();
                     if (attemptState === 'playing') {
                         setFeedback("Incorrect. Look for lava squares! (Strike 1)");
                         setAttemptState('strike1');
                     } else {
-                        setFeedback(`Incorrect. Solution was ${puzzle.solution}. (-1.0)`);
+                        setFeedback(`Incorrect. Main line was: ${solutionArray.join(', ')}. (-1.0)`);
                         updateLevel(-1.0);
-                        revealBoard();
+                        revealBoard(solutionArray[stepIndex]);
                     }
                 }
             };
 
             if (!puzzle) return <div className="text-slate-500 font-bold mt-10">Loading Database...</div>;
+
+            // Determine feedback color dynamically
+            let feedbackColorClass = 'text-slate-600';
+            if (feedback.includes('Incorrect')) feedbackColorClass = 'text-red-500';
+            else if (feedback.includes('Perfect') || feedback.includes('recovery')) feedbackColorClass = 'text-green-600';
+            else if (feedback.includes('Alternative')) feedbackColorClass = 'text-blue-600'; // Nice friendly blue!
 
             return (
                 <div className="flex flex-col items-center w-full">
@@ -600,7 +663,7 @@ const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
                         </div>
                     </div>
 
-                    <div className={`text-sm md:text-base font-bold min-h-[1.5rem] mb-4 text-center ${feedback.includes('Incorrect') ? 'text-red-500' : feedback.includes('Perfect') || feedback.includes('recovery') ? 'text-green-600' : 'text-slate-600'}`}>
+                    <div className={`text-sm md:text-base font-bold min-h-[1.5rem] mb-4 text-center transition-colors ${feedbackColorClass}`}>
                         {feedback}
                     </div>
 
@@ -635,7 +698,7 @@ const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
                                 />
                                 {attemptState === 'revealed' ? (
                                     <div className="flex space-x-2">
-                                        <button type="button" onClick={() => openLichess(currentFen)} className="flex-1 bg-purple-600 text-white font-bold py-4 rounded-xl hover:bg-purple-700 transition shadow-md">🔍 Analyze</button>
+                                        <button type="button" onClick={() => openLichess(puzzle.fen)} className="flex-1 bg-purple-600 text-white font-bold py-4 rounded-xl hover:bg-purple-700 transition shadow-md">🔍 Analyze</button>
                                         <button type="button" onClick={() => loadNewPuzzle(currentLevel)} className="flex-1 bg-slate-800 text-white font-bold py-4 rounded-xl hover:bg-slate-700 transition shadow-md">Next ➡️</button>
                                     </div>
                                 ) : (
@@ -1302,6 +1365,7 @@ const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
                             </div>
                         )}
 
+
                         {view === 'tiers' && <TierSelector onSelect={(l) => { setStartLvl(l); setView(activeDrill === 'bg' ? 'blindgames' : 'blindtactics'); }} onBack={() => setView('menu')} />}
 
                         {view === 'color' && <SquareColorDrill onExit={() => setView('menu')} isHardcore={isHardcore} />}
@@ -1311,6 +1375,15 @@ const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
                         
                         {view === 'blindtactics' && <BlindTacticDrill onExit={() => setView('menu')} isHardcore={isHardcore} startLevel={startLvl} />}
                         {view === 'blindgames' && <BlindGameDrill onExit={() => setView('menu')} isHardcore={isHardcore} startLevel={startLvl} />}
+                        {/* --- FOOTER --- */}
+                        <div className="w-full text-center py-8 mt-auto">
+                            <p className="text-slate-400 text-sm font-bold tracking-wide">
+                                Built with ❤️ by <span className="text-slate-500"> [Bournakas Apostolos]</span>
+                            </p>
+                            <p className="text-slate-300 text-xs mt-1">
+                                The [Σκακιστικός Σύλλογος Τρίπολης] Secret Weapon 🐑
+                            </p>
+                        </div>
                     </main>
                 </div>
             );
