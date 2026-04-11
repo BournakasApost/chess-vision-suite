@@ -445,7 +445,7 @@ window.BLIND_TACTICS_DB = [
         type: 'BlindTactic',
         difficulty: 2,
         theme: 'Pin',
-        fen: '4q1k1/pQ3pp1/1p2p2p/r1nn4/8/P5P1/1B3P1P/3RR1K1 w - - 1 2',
+        fen: '4q1k1/ppQn1pp1/1p2p2p/r2n4/8/P5P1/1B3P1P/3RR1K1 w - - 0 1',
         fog: ['1.Qxb7 Nc5',],
         solution: 'Qxd5'
      },
@@ -548,5 +548,131 @@ window.BLIND_TACTICS_DB = [
         fog: ['1.... Nd8',],
         solution: 'Rxb7+'
      },
+     {
+        id: 'bt-62',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Pin',
+        fen: '2r3k1/pp2pp1p/3p2p1/5q2/2r5/P1P2PRP/6K1/R2Q4 w - - 0 1',
+        fog: ['1.Qb1 Rxc3',],
+        solution: 'Qxf5'
+     },
+     {
+        id: 'bt-63',
+        type: 'BlindTactic',
+        difficulty: 7,
+        theme: 'Double Attack',
+        fen: '4k2r/pp2ppbp/2rp2p1/q7/5P2/2N3RP/PPP2P2/R2QK3 w Qk - 0 1',
+        fog: ['1.Kf1 Bxc3','2.bxc3 Rxc3'],
+        solution: ['Qd4','Rxg3','Qxh8+','Kd7','fxg3']
+     },
+     {
+        id: 'bt-64',
+        type: 'BlindTactic',
+        difficulty: 3,
+        theme: 'Eliminating the defence',
+        fen: '5q2/5bpk/3B1p2/1BK1p2P/P3P3/P1Q5/8/4n3 b - - 0 1',
+        fog: ['1.... Qc8+','2.Kb4'],
+        solution: 'Nc2+'
+     },
+     {
+        id: 'bt-65',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Eliminating the defence',
+        fen: 'r1b2rk1/pp2ppbp/2n3p1/q7/3Pn3/N1P2NP1/PB1Q1PBP/R2R2K1 w - - 0 1',
+        fog: ['1.Qc2 Bf5',],
+        solution: 'g4'
+     },
+     {
+        id: 'bt-66',
+        type: 'BlindTactic',
+        difficulty: 3,
+        theme: 'Eliminating the defence',
+        fen: '8/p5bp/1rpk2p1/1P1b1p2/P4N2/7P/5PP1/2KR1B2 w - - 0 1',
+        fog: ['1.a5 Rb8',],
+        solution: 'bxc6'
+     },{
+        id: 'bt-67',
+        type: 'BlindTactic',
+        difficulty: 4,
+        theme: 'Eliminating the defence',
+        fen: 'r5kr/5pb1/p2B2p1/1p3q1p/8/3R3P/PP2QPP1/2R3K1 w - - 0 1',
+        fog: ['1.Rc7 Rc8',],
+        solution: 'g4'
+     },
+     {
+        id: 'bt-68',
+        type: 'BlindTactic',
+        difficulty: 5,
+        theme: 'Eliminating the defence',
+        fen: '1r2qbk1/2p2p2/7p/4p3/1p2P3/1Q4P1/5P1P/2R2BK1 w - - 0 1',
+        fog: ['1.Rxc7 Rc8',],
+        solution: ['Bb5','Qxb5','Qxf7+']
+     },
+     {
+        id: 'bt-69',
+        type: 'BlindTactic',
+        difficulty: 3,
+        theme: 'Eliminating the defence',
+        fen: '2kr1r2/1b1pQ2p/p1p1p3/4q1p1/N1P5/1P6/5PPP/R4RK1 w - - 0 1',
+        fog: ['1.Nb6+ Kc7',],
+        solution: 'Nxd7'
+     },
+     {
+        id: 'bt-70',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Eliminating the defence',
+        fen: 'r1br1nk1/pp3p1p/2p2Qp1/q2p4/3P4/3B1N2/PPP2PPP/R4RK1 w - - 0 1',
+        fog: ['1.Ng5 Qc7',],
+        solution: 'Nxf7'
+     },
+     {
+        id: 'bt-71',
+        type: 'BlindTactic',
+        difficulty: 4,
+        theme: 'Eliminating the defence',
+        fen: '5r1k/6q1/2pNn1pp/p7/1p6/1P3BPb/P2Q3P/4R2K w - - 0 1',
+        fog: ['1.Bxc6 Nd4',],
+        solution: ['Ne8','Rxe8','Rxe8+']
+     },
+     {
+        id: 'bt-72',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Eliminating the defence',
+        fen: 'r4r1k/p6p/3p1pp1/2pP2n1/1p3Q2/3P2P1/PP2qN1P/1KR4R w - - 0 1',
+        fog: ['1.h4 Nf3',],
+        solution: 'Rc2'
+     },
+     {
+        id: 'bt-73',
+        type: 'BlindTactic',
+        difficulty: 4,
+        theme: 'Eliminating the defence',
+        fen: '6k1/3r2p1/3q3p/2p5/1b2Q3/3B4/6PP/7K w - - 0 1',
+        fog: ['1.Qe8+ Qf8',],
+        solution: ['Bc4+','Rd1+','Bf1']
+     },
+     {
+        id: 'bt-74',
+        type: 'BlindTactic',
+        difficulty: 3,
+        theme: 'Eliminating the defence',
+        fen: '1n3r2/2r3kp/p4p2/1p4b1/2p1Q2P/8/PP5q/1K1R1BR1 w - - 0 1',
+        fog: ['1.Rg2 Qe5',],
+        solution: 'Rxg5+'
+     },
+     {
+        id: 'bt-75',
+        type: 'BlindTactic',
+        difficulty: 5,
+        theme: 'Eliminating the defence',
+        fen: '6k1/3r2p1/3q3p/2p5/1b2Q3/3B4/6PP/7K w - - 0 1',
+        fog: ['1.Qe8+ Qf8','2.Bh7+ Kxh7','3.Qxf8'],
+        solution: 'Rd1+'
+     },
+
 
 ];
