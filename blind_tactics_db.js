@@ -668,7 +668,7 @@ window.BLIND_TACTICS_DB = [
         id: 'bt-75',
         type: 'BlindTactic',
         difficulty: 5,
-        theme: 'Eliminating the defence',
+        theme: 'Punish the blunder',
         fen: '6k1/3r2p1/3q3p/2p5/1b2Q3/3B4/6PP/7K w - - 0 1',
         fog: ['1.Qe8+ Qf8','2.Bh7+ Kxh7','3.Qxf8'],
         solution: 'Rd1+'
