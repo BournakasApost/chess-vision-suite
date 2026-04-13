@@ -202,10 +202,10 @@
         // NEW: Added themeFilter parameter
 const useAdaptiveEngine = (database, startLevel, themeFilter = 'Mix') => {
             const [currentLevel, setCurrentLevel] = React.useState(startLevel);
-            // NEW: The Engine's Memory Bank
             const [seenIds, setSeenIds] = React.useState(new Set()); 
 
             const getNextPuzzle = React.useCallback((targetLvl) => {
+                // 1. Filter by Theme
                 let pool = database || [];
                 if (themeFilter && themeFilter !== 'Mix') {
                     pool = pool.filter(p => p.theme === themeFilter);
@@ -213,36 +213,44 @@ const useAdaptiveEngine = (database, startLevel, themeFilter = 'Mix') => {
 
                 if (!pool || pool.length === 0) return null; 
 
-                // NEW: Filter out puzzles the student has already seen
+                // 2. Filter out puzzles they've already seen
                 let unseenPool = pool.filter(p => !seenIds.has(p.id));
 
-                // NEW: If they've seen every puzzle in this pool, wipe the memory and start over
+                // If they've seen everything in this theme, wipe memory and start over
                 if (unseenPool.length === 0) {
                     setSeenIds(new Set());
                     unseenPool = pool;
                 }
 
-                let closest = unseenPool[0];
-                let minDiff = Math.abs(unseenPool[0].difficulty - targetLvl);
+                let selectedPuzzle = null;
 
-                for (let i = 1; i < unseenPool.length; i++) {
-                    const diff = Math.abs(unseenPool[i].difficulty - targetLvl);
-                    if (diff < minDiff) {
-                        minDiff = diff;
-                        closest = unseenPool[i];
-                    } else if (diff === minDiff) {
-                        if (Math.random() > 0.5) closest = unseenPool[i]; 
-                    }
+                // --- 3. THE 3-TIER SELECTION LOGIC ---
+
+                // Tier 1: Look for anything within +/- 1.0 of their current level
+                const tier1 = unseenPool.filter(p => Math.abs(p.difficulty - targetLvl) <= 1.0);
+                
+                // Tier 2: Look for anything within +/- 2.0 of their current level
+                const tier2 = unseenPool.filter(p => Math.abs(p.difficulty - targetLvl) <= 2.0);
+
+                if (tier1.length > 0) {
+                    // Pick a completely random puzzle from the +/- 1.0 pool
+                    selectedPuzzle = tier1[Math.floor(Math.random() * tier1.length)];
+                } else if (tier2.length > 0) {
+                    // Expand search: Pick a random puzzle from the +/- 2.0 pool
+                    selectedPuzzle = tier2[Math.floor(Math.random() * tier2.length)];
+                } else {
+                    // Ultimate Fallback: Just give them a random unseen puzzle
+                    selectedPuzzle = unseenPool[Math.floor(Math.random() * unseenPool.length)];
                 }
 
-                // NEW: Record this puzzle ID in the memory bank
+                // 4. Record this puzzle in the memory bank
                 setSeenIds(prev => {
                     const newSet = new Set(prev);
-                    newSet.add(closest.id);
+                    newSet.add(selectedPuzzle.id);
                     return newSet;
                 });
 
-                return closest;
+                return selectedPuzzle;
             }, [database, themeFilter, seenIds]);
 
             const updateLevel = (change) => {
@@ -1336,7 +1344,7 @@ const BlindTacticDrill = ({ onExit, isHardcore, startLevel, themeFilter }) => {
             const [isHardcore, setIsHardcore] = useState(false);
             const [startLvl, setStartLvl] = useState(1.0);
             const [activeDrill, setActiveDrill] = useState(null);
-            const [selectedTheme, setSelectedTheme] = useState('Mix'); // <-- ADD THIS LINE
+            const [selectedTheme, setSelectedTheme] = useState('Mix'); 
 
             const MenuBtn = ({ title, desc, onClick }) => (
                 <button 
