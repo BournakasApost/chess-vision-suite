@@ -199,39 +199,37 @@
             return null;
         };
 
-        // --- ADAPTIVE ENGINE ---
-        const useAdaptiveEngine = (db, startLevel) => {
+        // NEW: Added themeFilter parameter
+        const useAdaptiveEngine = (database, startLevel, themeFilter = 'Mix') => {
             const [currentLevel, setCurrentLevel] = useState(startLevel);
-            const [seenIds, setSeenIds] = useState(new Set());
 
-            const getNextPuzzle = useCallback((targetLevel) => {
-                if (!db || db.length === 0) return null;
-
-                // Priority 1: +/- 1 Range, Unseen
-                let pool = db.filter(p => !seenIds.has(p.id) && p.difficulty >= targetLevel - 1 && p.difficulty <= targetLevel + 1);
-                
-                // Priority 2: +/- 2 Range, Unseen
-                if (pool.length === 0) {
-                    pool = db.filter(p => !seenIds.has(p.id) && p.difficulty >= targetLevel - 2 && p.difficulty <= targetLevel + 2);
+            const getNextPuzzle = useCallback((targetLvl) => {
+                // 1. Filter the database by theme if needed
+                let pool = database;
+                if (themeFilter && themeFilter !== 'Mix') {
+                    pool = database.filter(p => p.theme === themeFilter);
                 }
 
-                // Priority 3: Fail-safe (Out of unseen puzzles, reset memory, pick closest)
-                if (pool.length === 0) {
-                    setSeenIds(new Set()); 
-                    pool = db.filter(p => p.difficulty >= targetLevel - 2 && p.difficulty <= targetLevel + 2);
-                    if (pool.length === 0) pool = db; 
+                if (pool.length === 0) return null; // Safety net if a theme is empty
+
+                // 2. Find the puzzle closest to the target level
+                let closest = pool[0];
+                let minDiff = Math.abs(pool[0].difficulty - targetLvl);
+
+                for (let i = 1; i < pool.length; i++) {
+                    const diff = Math.abs(pool[i].difficulty - targetLvl);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        closest = pool[i];
+                    } else if (diff === minDiff) {
+                        if (Math.random() > 0.5) closest = pool[i]; // Randomize ties
+                    }
                 }
+                return closest;
+            }, [database, themeFilter]); // Added themeFilter to dependencies
 
-                const selected = pool[Math.floor(Math.random() * pool.length)];
-                setSeenIds(prev => new Set(prev).add(selected.id));
-                return selected;
-            }, [db, seenIds]);
-
-            const updateLevel = (delta) => {
-                setCurrentLevel(prev => {
-                    const newLvl = Math.max(1.0, Math.min(10.0, prev + delta));
-                    return Number(newLvl.toFixed(1)); 
-                });
+            const updateLevel = (change) => {
+                setCurrentLevel(prev => Math.max(1, Math.min(10, prev + change)));
             };
 
             return { currentLevel, getNextPuzzle, updateLevel };
@@ -267,10 +265,9 @@
                 </div>
             );
         };
-
-        const Chessboard = ({ pieces = [], markers = [], onSquareClick, disabled = false, showCoords = true, renderMode = 'normal' }) => {
-            const squares = [];
-            for (let row = 7; row >= 0; row--) {
+            const Chessboard = ({ pieces = [], markers = [], onSquareClick, disabled = false, showCoords = true, renderMode = 'normal' }) => {
+                const squares = [];
+                for (let row = 7; row >= 0; row--) {
                 for (let col = 0; col <= 7; col++) {
                     const isDark = isDarkSquare(col, row);
                     const piece = pieces.find(p => p.pos[0] === col && p.pos[1] === row);
@@ -281,12 +278,13 @@
                             key={`${col}-${row}`}
                             onClick={() => !disabled && onSquareClick && onSquareClick(col, row)}
                             className={`relative w-full aspect-square flex items-center justify-center select-none overflow-hidden
-                                ${isDark ? 'bg-slate-500' : 'bg-slate-200'}
+                                ${isDark ? 'bg-[#f0d9b5]' : 'bg-[#b58863]'}
                                 ${onSquareClick && !disabled ? 'cursor-pointer hover:opacity-80' : ''}
                             `}
                         >
-                            {showCoords && col === 0 && <span className={`absolute top-1 left-1 text-[10px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>{row + 1}</span>}
-                            {showCoords && row === 0 && <span className={`absolute bottom-0 right-1 text-[10px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>{String.fromCharCode(col + 97)}</span>}
+                            {/* Updated coordinates to match Lichess contrast perfectly */}
+                            {showCoords && col === 0 && <span className={`absolute top-1 left-1 text-[10px] font-bold ${isDark ? 'text-[#b58863]' : 'text-[#f0d9b5]'}`}>{row + 1}</span>}
+                            {showCoords && row === 0 && <span className={`absolute bottom-0 right-1 text-[10px] font-bold ${isDark ? 'text-[#b58863]' : 'text-[#f0d9b5]'}`}>{String.fromCharCode(col + 97)}</span>}
                             
                             {marker && <div className={`absolute w-full h-full ${marker.opacity || 'opacity-60'} ${marker.color}`} />}
                             
@@ -310,7 +308,6 @@
                 </div>
             );
         };
-
         const TierSelector = ({ onSelect, onBack }) => (
             <div className="flex flex-col items-center w-full max-w-lg mt-8 space-y-6">
                 <div className="text-center mb-4">
@@ -355,8 +352,8 @@
         // --- ADAPTIVE DRILLS ---
 
 
-const BlindGameDrill = ({ onExit, isHardcore, startLevel }) => {
-            const { currentLevel, getNextPuzzle, updateLevel } = useAdaptiveEngine(BLIND_GAMES, startLevel);
+const BlindGameDrill = ({ onExit, isHardcore, startLevel, themeFilter }) => {
+            const { currentLevel, getNextPuzzle, updateLevel } = useAdaptiveEngine(BLIND_GAMES, startLevel,themeFilter);
             
             const [puzzle, setPuzzle] = useState(null);
             const [moveIndex, setMoveIndex] = useState(0);
@@ -540,8 +537,8 @@ const BlindGameDrill = ({ onExit, isHardcore, startLevel }) => {
             );
         };
 
-const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
-            const { currentLevel, getNextPuzzle, updateLevel } = useAdaptiveEngine(BLIND_TACTICS, startLevel);
+const BlindTacticDrill = ({ onExit, isHardcore, startLevel, themeFilter }) => {
+            const { currentLevel, getNextPuzzle, updateLevel } = useAdaptiveEngine(BLIND_TACTICS, startLevel, themeFilter);
             
             const [puzzle, setPuzzle] = useState(null);
             const [currentFen, setCurrentFen] = useState('');
@@ -1322,6 +1319,7 @@ const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
             const [isHardcore, setIsHardcore] = useState(false);
             const [startLvl, setStartLvl] = useState(1.0);
             const [activeDrill, setActiveDrill] = useState(null);
+            const [selectedTheme, setSelectedTheme] = useState('Mix'); // <-- ADD THIS LINE
 
             const MenuBtn = ({ title, desc, onClick }) => (
                 <button 
@@ -1355,9 +1353,28 @@ const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
                                 <MenuBtn title="2. Knight Sight" desc="Find all legal squares a Knight can jump to from its current position." onClick={() => setView('knight')} />
                                 <MenuBtn title="3. Triangulation" desc="The Queen's Crosshair. Find the intersection point that attacks 3 distinct targets." onClick={() => setView('triangulation')} />
                                 <MenuBtn title="4. The Pathfinder" desc="Navigate a minefield. Reach the target while avoiding Ghost piece lines of sight." onClick={() => setView('pathfinder')} />
-                                
+                                                                
                                 <div className="border-t-2 border-slate-200 pt-4 mt-2">
+
                                     <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 ml-2">Adaptive Training Engine</div>
+                                    {/* --- TARGET FOCUS SELECTOR --- */}
+                                <div className="w-full max-w-sm mb-6 flex flex-col items-center">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                                        
+                                    </label>
+                                    <select 
+                                        value={selectedTheme} 
+                                        onChange={(e) => setSelectedTheme(e.target.value)}
+                                        className="w-full bg-white border-2 border-slate-200 text-slate-700 font-bold py-3 px-4 rounded-xl focus:outline-none focus:border-blue-500 shadow-sm appearance-none text-center cursor-pointer"
+                                    >
+                                        <option value="Mix">🎲 Full Spectrum (Mixed)</option>
+                                        
+                                        {/* This magically extracts all unique themes from your tactic database! */}
+                                        {[...new Set(BLIND_TACTICS.map(p => p.theme))].map(theme => (
+                                            <option key={theme} value={theme}>🎯 {theme}</option>
+                                        ))}
+                                    </select>
+                                </div>
                                     <MenuBtn title="5. Blindfold Tactics (Adaptive)" desc="Deep calculation. Static board. Visualize the 'Fog' moves mentally." onClick={() => { setActiveDrill('bt'); setView('tiers'); }} />
                                     <div className="mt-4"></div>
                                     <MenuBtn title="6. Blind Games (Adaptive)" desc="Piece tracking. Use arrow keys to step through a variation with generic circles." onClick={() => { setActiveDrill('bg'); setView('tiers'); }} />
@@ -1373,8 +1390,22 @@ const BlindTacticDrill = ({ onExit, isHardcore, startLevel }) => {
                         {view === 'triangulation' && <TriangulationDrill onExit={() => setView('menu')} isHardcore={isHardcore} />}
                         {view === 'pathfinder' && <PathfinderDrill onExit={() => setView('menu')} isHardcore={isHardcore} />}
                         
-                        {view === 'blindtactics' && <BlindTacticDrill onExit={() => setView('menu')} isHardcore={isHardcore} startLevel={startLvl} />}
-                        {view === 'blindgames' && <BlindGameDrill onExit={() => setView('menu')} isHardcore={isHardcore} startLevel={startLvl} />}
+                        {view === 'blindtactics' && (
+                            <BlindTacticDrill 
+                                onExit={() => setView('menu')} 
+                                isHardcore={isHardcore} 
+                                startLevel={startLvl} 
+                                themeFilter={selectedTheme} 
+                            />
+                        )}
+                        {view === 'blindgames' && (
+                            <BlindGameDrill 
+                                onExit={() => setView('menu')} 
+                                isHardcore={isHardcore} 
+                                startLevel={startLvl} 
+                                themeFilter={selectedTheme} 
+                            />
+                        )}
                         {/* --- FOOTER --- */}
                         <div className="w-full text-center py-8 mt-auto">
                             <p className="text-slate-400 text-sm font-bold tracking-wide">
