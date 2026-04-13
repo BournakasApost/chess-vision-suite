@@ -200,33 +200,50 @@
         };
 
         // NEW: Added themeFilter parameter
-        const useAdaptiveEngine = (database, startLevel, themeFilter = 'Mix') => {
-            const [currentLevel, setCurrentLevel] = useState(startLevel);
+const useAdaptiveEngine = (database, startLevel, themeFilter = 'Mix') => {
+            const [currentLevel, setCurrentLevel] = React.useState(startLevel);
+            // NEW: The Engine's Memory Bank
+            const [seenIds, setSeenIds] = React.useState(new Set()); 
 
-            const getNextPuzzle = useCallback((targetLvl) => {
-                // 1. Filter the database by theme if needed
-                let pool = database;
+            const getNextPuzzle = React.useCallback((targetLvl) => {
+                let pool = database || [];
                 if (themeFilter && themeFilter !== 'Mix') {
-                    pool = database.filter(p => p.theme === themeFilter);
+                    pool = pool.filter(p => p.theme === themeFilter);
                 }
 
-                if (pool.length === 0) return null; // Safety net if a theme is empty
+                if (!pool || pool.length === 0) return null; 
 
-                // 2. Find the puzzle closest to the target level
-                let closest = pool[0];
-                let minDiff = Math.abs(pool[0].difficulty - targetLvl);
+                // NEW: Filter out puzzles the student has already seen
+                let unseenPool = pool.filter(p => !seenIds.has(p.id));
 
-                for (let i = 1; i < pool.length; i++) {
-                    const diff = Math.abs(pool[i].difficulty - targetLvl);
+                // NEW: If they've seen every puzzle in this pool, wipe the memory and start over
+                if (unseenPool.length === 0) {
+                    setSeenIds(new Set());
+                    unseenPool = pool;
+                }
+
+                let closest = unseenPool[0];
+                let minDiff = Math.abs(unseenPool[0].difficulty - targetLvl);
+
+                for (let i = 1; i < unseenPool.length; i++) {
+                    const diff = Math.abs(unseenPool[i].difficulty - targetLvl);
                     if (diff < minDiff) {
                         minDiff = diff;
-                        closest = pool[i];
+                        closest = unseenPool[i];
                     } else if (diff === minDiff) {
-                        if (Math.random() > 0.5) closest = pool[i]; // Randomize ties
+                        if (Math.random() > 0.5) closest = unseenPool[i]; 
                     }
                 }
+
+                // NEW: Record this puzzle ID in the memory bank
+                setSeenIds(prev => {
+                    const newSet = new Set(prev);
+                    newSet.add(closest.id);
+                    return newSet;
+                });
+
                 return closest;
-            }, [database, themeFilter]); // Added themeFilter to dependencies
+            }, [database, themeFilter, seenIds]);
 
             const updateLevel = (change) => {
                 setCurrentLevel(prev => Math.max(1, Math.min(10, prev + change)));
