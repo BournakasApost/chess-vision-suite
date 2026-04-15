@@ -1070,6 +1070,44 @@ window.BLIND_TACTICS_DB = [
         fog: ['1.Rg1 Kxh6'],
         solution: ['Bf4#'],
      },
+     {
+        id: 'bt-120',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Mate: Visualising',
+        fen: 'b4K2/8/p1k5/4Q3/P7/8/5B2/8 w - - 0 1',
+        fog: ['1.Bg3 a5'],
+        solution: ['Qb5#'],
+     },
+     {
+        id: 'bt-121',
+        type: 'BlindTactic',
+        difficulty: 1,
+        theme: 'Mate: Visualising',
+        fen: 'b4K2/8/p1k5/4Q3/P7/8/5B2/8 w - - 0 1',
+        fog: ['1.Bg3 Bb7'],
+        solution: ['Qd6#'],
+     },
+     {
+        id: 'bt-122',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Mate: Visualising',
+        fen: 'b4K2/8/p1k5/4Q3/P7/8/5B2/8 w - - 0 1',
+        fog: ['1.Bg3 Kd7'],
+        solution: ['Qe8#'],
+     },
+     {
+        id: 'bt-123',
+        type: 'BlindTactic',
+        difficulty: 1,
+        theme: 'Mate: Visualising',
+        fen: 'b4K2/8/p1k5/4Q3/P7/8/5B2/8 w - - 0 1',
+        fog: ['1.Bg3 Kb3'],
+        solution: ['Qc7#'],
+     },
+     
+
 
 
 ];
