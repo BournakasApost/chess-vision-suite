@@ -303,13 +303,13 @@ const useAdaptiveEngine = (database, startLevel, themeFilter = 'Mix') => {
                             key={`${col}-${row}`}
                             onClick={() => !disabled && onSquareClick && onSquareClick(col, row)}
                             className={`relative w-full aspect-square flex items-center justify-center select-none overflow-hidden
-                                ${isDark ? 'bg-[#f0d9b5]' : 'bg-[#b58863]'}
+                                ${isDark ? 'bg-[#b58863]' : 'bg-[#f0d9b5]'}
                                 ${onSquareClick && !disabled ? 'cursor-pointer hover:opacity-80' : ''}
                             `}
                         >
                             {/* Updated coordinates to match Lichess contrast perfectly */}
-                            {showCoords && col === 0 && <span className={`absolute top-1 left-1 text-[10px] font-bold ${isDark ? 'text-[#b58863]' : 'text-[#f0d9b5]'}`}>{row + 1}</span>}
-                            {showCoords && row === 0 && <span className={`absolute bottom-0 right-1 text-[10px] font-bold ${isDark ? 'text-[#b58863]' : 'text-[#f0d9b5]'}`}>{String.fromCharCode(col + 97)}</span>}
+                            {showCoords && col === 0 && <span className={`absolute top-1 left-1 text-[10px] font-bold ${isDark ? 'text-[#f0d9b5]' : 'text-[#b58863]'}`}>{row + 1}</span>}
+                            {showCoords && row === 0 && <span className={`absolute bottom-0 right-1 text-[10px] font-bold ${isDark ? 'text-[#f0d9b5]' : 'text-[#b58863]'}`}>{String.fromCharCode(col + 97)}</span>}
                             
                             {marker && <div className={`absolute w-full h-full ${marker.opacity || 'opacity-60'} ${marker.color}`} />}
                             
