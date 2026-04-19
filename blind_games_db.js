@@ -237,7 +237,7 @@ window.BLIND_GAMES_DB = [
         fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
         moves: ['Nf3','Nf6','g4','Nxg4','h4','e5','Bh3','h5','Bxg4','hxg4','Nxe5','d6','Nd3','Rxh4','Rxh4','Qxh4','Nc3'],
         question: "Find the winning move (e.g. Rxc4#).",
-        solution: 'Qxf7+'
+        solution: 'Qxh1#'
     },
     {
         id: 'bg-25',
@@ -268,5 +268,15 @@ window.BLIND_GAMES_DB = [
         moves: ['Nf3', 'Nc6', 'g3', 'e5', 'Bg2', 'd5', 'O-O', 'Nf6', 'd4', 'e4', 'Ne5', 'Bg4', 'Nc3', 'Bd6', 'f3', 'Bh5', 'g4', 'Bg6', 'Nxg6', 'hxg6', 'fxe4', 'Bxh2+', 'Kf2', 'Nxg4+', 'Ke1', 'Qh4+', 'Kd2', 'Bf4+', 'Kd3'],
         question: "Find the winning move (e.g. Rxc4#).",
         solution: 'Nb4#'
+    },
+    {
+        id: 'bg-28',
+        type: 'BlindGame',
+        difficulty: 1,
+        theme: 'Checkmate',
+        fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+        moves: ['d4','f5','Nc3','Nh6','Bxh6','gxh6','e4','fxe4'],
+        question: "Find the winning move (e.g. Rxc4#).",
+        solution: 'Qh5#'
     },
 ];
