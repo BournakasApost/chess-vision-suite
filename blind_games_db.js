@@ -279,4 +279,14 @@ window.BLIND_GAMES_DB = [
         question: "Find the winning move (e.g. Rxc4#).",
         solution: 'Qh5#'
     },
+    {
+        id: 'bg-29',
+        type: 'BlindGame',
+        difficulty: 3,
+        theme: 'Checkmate',
+        fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+        moves: ['d4','Nf6','c4','c5','d5','e5','Qc2','Bd6','Nc3','O-O','e4','Ne8','Bd3','a5','Nge2','Qg5'],
+        question: "Find the winning move (e.g. Rxc4#).",
+        solution: 'Bxg5#'
+    },
 ];
