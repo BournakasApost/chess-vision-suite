@@ -1925,6 +1925,33 @@ window.BLIND_TACTICS_DB = [
         fog: ['1.Ree2 Rxg2+'],
         solution: ['Qxg2'],
      },
+     {
+        id: 'bt-214',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Defensive Tactics',
+        fen: '2r1k3/p1pn4/3p2pq/3Ppp2/8/P2Q1PP1/1PP1NRP1/1K1R3r b - - 0 1',
+        fog: ['1.... Nc5','2.Qb5+'],
+        solution: ['c6'],
+     },
+     {
+        id: 'bt-215',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Defensive Tactics',
+        fen: '6r1/1kb4p/1p2p3/4np2/P1P4P/R2B2P1/8/6BK b - - 0 1',
+        fog: ['1.... Rxg3','2.Be4+'],
+        solution: ['Nc6'],
+     },
+     {
+        id: 'bt-216',
+        type: 'BlindTactic',
+        difficulty: 4,
+        theme: 'Defensive Tactics',
+        fen: '7k/5pp1/3p3p/3P1QP1/2P1pP1K/7P/5q2/R7 w - - 0 1',
+        fog: ['1.Kh5 g6+'],
+        solution: ['Qxg6'],
+     },
 
 
      
