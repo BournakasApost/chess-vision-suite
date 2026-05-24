@@ -2033,6 +2033,33 @@ window.BLIND_TACTICS_DB = [
         fog: ['1.... Qf7','2.Qa8+'],
         solution: ['Kh7'],
      },
+     {
+        id: 'bt-226',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Weak King',
+        fen: 'rnb2rk1/ppppqp1p/6p1/2b5/2B5/6Q1/PB1N1PPP/R4RK1 w - - 0 2',
+        fog: ['1.Qg3 g6'],
+        solution: ['Qc3'],
+     },
+     {
+        id: 'bt-227',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Winning Material',
+        fen: 'rn2k2r/pp2qppp/2p2n2/1Q1pP3/1b6/5N2/PB3PPP/RN3K1R w kq - 0 2',
+        fog: ['1.Qxb5+ c6'],
+        solution: ['exf6'],
+     },
+     {
+        id: 'bt-228',
+        type: 'BlindTactic',
+        difficulty: 2,
+        theme: 'Double Attack',
+        fen: 'r2q1rk1/ppp2ppp/2npb3/3B4/1b2P3/6N1/PB3PPP/R2Q1RK1 w - - 0 1',
+        fog: ['1.Bxc6 bxc6'],
+        solution: ['Qd4'],
+     },
 
 
 
